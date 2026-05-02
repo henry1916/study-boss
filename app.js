@@ -137,7 +137,6 @@ function loadPlayer(username) {
       username: username || "Guest",
       coins: Number(saved.coins ?? legacy.coins) || 0,
       damageBoost: Number(saved.damageBoost ?? legacy.damageBoost) || 0,
-      hpBoost: Number(saved.hpBoost ?? legacy.hpBoost) || 0,
       coinBoost: Number(saved.coinBoost ?? legacy.coinBoost) || 0,
       shieldBoost: Number(saved.shieldBoost ?? legacy.shieldBoost) || 0,
       bossesDefeated: Number(saved.bossesDefeated) || 0,
@@ -148,7 +147,6 @@ function loadPlayer(username) {
       username: username || "Guest",
       coins: 0,
       damageBoost: 0,
-      hpBoost: 0,
       coinBoost: 0,
       shieldBoost: 0,
       bossesDefeated: 0,
@@ -340,16 +338,6 @@ const shopItems = [
     cost: (value) => 30 + value * 6,
     buy: () => {
       player.damageBoost += 5;
-    }
-  },
-  {
-    id: "hpBoost",
-    name: "Heart Crystal",
-    description: "+20 default hero HP in new battles.",
-    levelText: (value) => `HP +${value}`,
-    cost: (value) => 35 + value * 3,
-    buy: () => {
-      player.hpBoost += 20;
     }
   },
   {
@@ -644,22 +632,7 @@ function makeTrueFalseQuestion(fact, allFacts, index) {
   };
 }
 
-function makeQuestion(fact, allFacts, allWords, index) {
-  if (index % 5 === 3) {
-    return makeTrueFalseQuestion(fact, allFacts, index);
-  }
-
-  if (fact.kind === "recall" || index % 4 === 2) {
-    return {
-      type: "typed",
-      prompt: fact.kind === "recall" ? fact.prompt : `Answer from memory: ${fact.prompt}`,
-      answer: fact.answer,
-      source: fact.source,
-      hint: `Think about ${fact.subject}.`,
-      topic: titleCase(importantWords(`${fact.subject} ${fact.answer}`)[0] || fact.subject)
-    };
-  }
-
+function makeFactQuestion(fact, allFacts, allWords, index) {
   const options = shuffle([
     fact.answer,
     ...makeDistractors(fact.answer, allFacts, allWords, index)
@@ -674,6 +647,66 @@ function makeQuestion(fact, allFacts, allWords, index) {
     hint: `Think about ${fact.subject}.`,
     topic: titleCase(importantWords(`${fact.subject} ${fact.answer}`)[0] || fact.subject)
   };
+}
+
+function makeReverseQuestion(fact, allFacts, allWords, index) {
+  const prompt = `Which topic matches this clue: "${fact.answer}"?`;
+  const options = shuffle([
+    fact.subject,
+    ...allFacts
+      .map((item) => item.subject)
+      .filter((subject) => normalize(subject) !== normalize(fact.subject)),
+    ...allWords.map(titleCase)
+  ]).slice(0, 4);
+
+  return {
+    type: "choice",
+    prompt,
+    answer: fact.subject,
+    options: options.length >= 2 ? options : [fact.subject, "A process", "A location", "A result"],
+    source: fact.source,
+    hint: `Match the clue back to the right term.`,
+    topic: titleCase(importantWords(`${fact.subject} ${fact.answer}`)[0] || fact.subject)
+  };
+}
+
+function makeApplicationQuestion(fact) {
+  return {
+    type: "typed",
+    prompt: `Use your own words: why is ${fact.subject} important here?`,
+    answer: fact.answer,
+    source: fact.source,
+    hint: `Use the idea: ${fact.answer}`,
+    topic: titleCase(importantWords(`${fact.subject} ${fact.answer}`)[0] || fact.subject)
+  };
+}
+
+function makeQuestion(fact, allFacts, allWords, index) {
+  const cycle = index % 5;
+  if (cycle === 3) {
+    return makeTrueFalseQuestion(fact, allFacts, index);
+  }
+
+  if (cycle === 4) {
+    return makeReverseQuestion(fact, allFacts, allWords, index);
+  }
+
+  if (fact.kind === "recall" || cycle === 2) {
+    return {
+      type: "typed",
+      prompt: fact.kind === "recall" ? fact.prompt : `Answer from memory: ${fact.prompt}`,
+      answer: fact.answer,
+      source: fact.source,
+      hint: `Think about ${fact.subject}.`,
+      topic: titleCase(importantWords(`${fact.subject} ${fact.answer}`)[0] || fact.subject)
+    };
+  }
+
+  if (cycle === 1) {
+    return makeApplicationQuestion(fact);
+  }
+
+  return makeFactQuestion(fact, allFacts, allWords, index);
 }
 
 function shuffle(items) {
@@ -692,8 +725,17 @@ function buildQuestions(notes, count = 15) {
   const source = sentences.length ? sentences : [cleanText(notes)];
   const facts = source.map(extractFact);
   const questions = [];
-  for (let index = 0; index < count; index += 1) {
-    questions.push(makeQuestion(facts[index % facts.length], facts, words, index));
+  const usedPrompts = new Set();
+  for (let pass = 0; questions.length < count && pass < 5; pass += 1) {
+    facts.forEach((fact, factIndex) => {
+      if (questions.length >= count) return;
+      const index = pass * facts.length + factIndex;
+      const question = makeQuestion(fact, facts, words, index);
+      const key = normalize(`${question.prompt} ${question.answer}`);
+      if (usedPrompts.has(key)) return;
+      usedPrompts.add(key);
+      questions.push(question);
+    });
   }
   return questions;
 }
@@ -706,7 +748,6 @@ function prepareBattle() {
   }
 
   pendingNotes = notes;
-  playerHpInput.value = String(100 + (Number(player.hpBoost) || 0));
   battleSetupPanel.classList.remove("hidden");
   errorMessage.textContent = "";
 }
@@ -1081,7 +1122,6 @@ adminAddCoinsButton.addEventListener("click", () => {
 adminMaxDamageButton.addEventListener("click", () => {
   if (!requireOwner()) return;
   player.damageBoost = 100;
-  player.hpBoost = 200;
   player.shieldBoost = 12;
   player.coinBoost = 5;
   savePlayer();
@@ -1098,7 +1138,6 @@ adminResetButton.addEventListener("click", () => {
   if (!requireOwner()) return;
   player.coins = 0;
   player.damageBoost = 0;
-  player.hpBoost = 0;
   player.shieldBoost = 0;
   player.coinBoost = 0;
   player.bossesDefeated = 0;

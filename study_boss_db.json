@@ -43,8 +43,10 @@
       "createdAt": 1777745551,
       "player": {
         "username": "owner",
-        "coins": 31,
-        "damageBoost": 0,
+        "coins": 32,
+        "damageBoost": 70,
+        "coinBoost": 1,
+        "shieldBoost": 8,
         "bossesDefeated": 0,
         "avatar": {
           "color": "#f5c451",
