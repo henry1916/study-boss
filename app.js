@@ -23,8 +23,8 @@ const fileInput = document.querySelector("#fileInput");
 const demoButton = document.querySelector("#demoButton");
 const openShopButton = document.querySelector("#openShopButton");
 const homeShopPanel = document.querySelector("#homeShopPanel");
-const homeBuyDamageButton = document.querySelector("#homeBuyDamageButton");
 const homeShopCopy = document.querySelector("#homeShopCopy");
+const homeShopItems = document.querySelector("#homeShopItems");
 const miniAvatar = document.querySelector("#miniAvatar");
 const avatarDisplay = document.querySelector("#avatarDisplay");
 const avatarColorOptions = document.querySelector("#avatarColorOptions");
@@ -75,8 +75,8 @@ const resultCopy = document.querySelector("#resultCopy");
 const weakList = document.querySelector("#weakList");
 const earnedCoins = document.querySelector("#earnedCoins");
 const boostValue = document.querySelector("#boostValue");
-const buyDamageButton = document.querySelector("#buyDamageButton");
 const shopCopy = document.querySelector("#shopCopy");
+const resultShopItems = document.querySelector("#resultShopItems");
 const rematchButton = document.querySelector("#rematchButton");
 
 const demoNotes = `Photosynthesis is the process plants use to turn sunlight, carbon dioxide, and water into glucose and oxygen.
@@ -137,11 +137,23 @@ function loadPlayer(username) {
       username: username || "Guest",
       coins: Number(saved.coins ?? legacy.coins) || 0,
       damageBoost: Number(saved.damageBoost ?? legacy.damageBoost) || 0,
+      hpBoost: Number(saved.hpBoost ?? legacy.hpBoost) || 0,
+      coinBoost: Number(saved.coinBoost ?? legacy.coinBoost) || 0,
+      shieldBoost: Number(saved.shieldBoost ?? legacy.shieldBoost) || 0,
       bossesDefeated: Number(saved.bossesDefeated) || 0,
       avatar: { ...defaultAvatar, ...(saved.avatar || legacy.avatar || {}) }
     };
   } catch {
-    return { username: username || "Guest", coins: 0, damageBoost: 0, bossesDefeated: 0, avatar: { ...defaultAvatar } };
+    return {
+      username: username || "Guest",
+      coins: 0,
+      damageBoost: 0,
+      hpBoost: 0,
+      coinBoost: 0,
+      shieldBoost: 0,
+      bossesDefeated: 0,
+      avatar: { ...defaultAvatar }
+    };
   }
 }
 
@@ -319,8 +331,51 @@ function signOut() {
   showAuthScreen("Signed out. Your saved heroes are still on this browser.");
 }
 
-function upgradeCost() {
-  return 30 + player.damageBoost * 6;
+const shopItems = [
+  {
+    id: "damageBoost",
+    name: "Recall Blade",
+    description: "+5 damage on every attack.",
+    levelText: (value) => `Damage +${value}`,
+    cost: (value) => 30 + value * 6,
+    buy: () => {
+      player.damageBoost += 5;
+    }
+  },
+  {
+    id: "hpBoost",
+    name: "Heart Crystal",
+    description: "+20 default hero HP in new battles.",
+    levelText: (value) => `HP +${value}`,
+    cost: (value) => 35 + value * 3,
+    buy: () => {
+      player.hpBoost += 20;
+    }
+  },
+  {
+    id: "shieldBoost",
+    name: "Block Charm",
+    description: "Boss attacks deal 2 less damage.",
+    levelText: (value) => `Block -${value}`,
+    cost: (value) => 40 + value * 12,
+    buy: () => {
+      player.shieldBoost += 2;
+    }
+  },
+  {
+    id: "coinBoost",
+    name: "Lucky Pouch",
+    description: "+10% coin rewards per level.",
+    levelText: (value) => `Coins +${value * 10}%`,
+    cost: (value) => 45 + value * 30,
+    buy: () => {
+      player.coinBoost += 1;
+    }
+  }
+];
+
+function upgradeCost(item) {
+  return item.cost(Number(player[item.id]) || 0);
 }
 
 function updatePlayerHud() {
@@ -328,21 +383,45 @@ function updatePlayerHud() {
   playerName.textContent = player.username || "Guest";
   coinValue.textContent = String(player.coins);
   boostValue.textContent = `+${player.damageBoost}`;
-  const cost = upgradeCost();
-  buyDamageButton.textContent = `Buy +5 Damage (${cost} coins)`;
-  homeBuyDamageButton.textContent = `Buy +5 Damage (${cost} coins)`;
-  buyDamageButton.disabled = player.coins < cost;
-  homeBuyDamageButton.disabled = player.coins < cost;
-  shopCopy.textContent = player.coins < cost
+  const cheapestUpgrade = Math.min(...shopItems.map((item) => upgradeCost(item)));
+  shopCopy.textContent = player.coins < cheapestUpgrade
     ? `You have ${player.coins} coins and ${player.bossesDefeated} boss wins. Beat bosses to afford the next upgrade.`
-    : `You have ${player.coins} coins. This upgrade adds 5 damage to every attack.`;
+    : `You have ${player.coins} coins. Choose an upgrade for your next fight.`;
   homeShopCopy.textContent = shopCopy.textContent;
+  renderShopItems(homeShopItems);
+  renderShopItems(resultShopItems);
   adminToggleButton.classList.toggle("hidden", !isOwner());
   if (!isOwner()) {
     adminPanel.classList.add("hidden");
   }
   devBattleControls.classList.toggle("hidden", !isOwner());
   renderAvatar();
+}
+
+function renderShopItems(container) {
+  container.innerHTML = "";
+  shopItems.forEach((item) => {
+    const value = Number(player[item.id]) || 0;
+    const cost = upgradeCost(item);
+    const card = document.createElement("div");
+    card.className = "shop-item";
+
+    const title = document.createElement("strong");
+    title.textContent = item.name;
+    const level = document.createElement("span");
+    level.textContent = item.levelText(value);
+    const description = document.createElement("p");
+    description.textContent = item.description;
+    const button = document.createElement("button");
+    button.className = "secondary-button";
+    button.type = "button";
+    button.textContent = `Buy (${cost})`;
+    button.disabled = player.coins < cost;
+    button.addEventListener("click", () => buyUpgrade(item));
+
+    card.append(title, level, description, button);
+    container.append(card);
+  });
 }
 
 function isOwner() {
@@ -396,11 +475,11 @@ function buildAvatarOptions() {
   });
 }
 
-function buyDamageUpgrade() {
-  const cost = upgradeCost();
+function buyUpgrade(item) {
+  const cost = upgradeCost(item);
   if (player.coins < cost) return;
   player.coins -= cost;
-  player.damageBoost += 5;
+  item.buy();
   savePlayer();
   updatePlayerHud();
 }
@@ -627,6 +706,7 @@ function prepareBattle() {
   }
 
   pendingNotes = notes;
+  playerHpInput.value = String(100 + (Number(player.hpBoost) || 0));
   battleSetupPanel.classList.remove("hidden");
   errorMessage.textContent = "";
 }
@@ -770,11 +850,12 @@ function damageForScore(score) {
 }
 
 function bossDamageForScore(score) {
-  if (score >= 0.9) return 0;
-  if (score >= 0.65) return 4;
-  if (score >= 0.35) return 9;
-  if (score > 0) return 13;
-  return 18;
+  let damage = 18;
+  if (score >= 0.9) damage = 0;
+  else if (score >= 0.65) damage = 4;
+  else if (score >= 0.35) damage = 9;
+  else if (score > 0) damage = 13;
+  return Math.max(0, damage - (Number(player.shieldBoost) || 0));
 }
 
 function submitAttack() {
@@ -913,7 +994,8 @@ function showResults() {
   document.querySelector(".battle-grid").classList.add("hidden");
   const won = game.health <= 0;
   const survived = game.playerHealth > 0;
-  const coinReward = Math.max(8, Math.round(game.xp / 2)) + (won ? 25 : survived ? 8 : 3);
+  const baseCoinReward = Math.max(8, Math.round(game.xp / 2)) + (won ? 25 : survived ? 8 : 3);
+  const coinReward = Math.round(baseCoinReward * (1 + (Number(player.coinBoost) || 0) * 0.1));
   player.coins += coinReward;
   if (won) {
     player.bossesDefeated += 1;
@@ -982,10 +1064,6 @@ rematchButton.addEventListener("click", () => {
   document.querySelector(".battle-grid").classList.remove("hidden");
   startBattle();
 });
-buyDamageButton.addEventListener("click", () => {
-  buyDamageUpgrade();
-});
-homeBuyDamageButton.addEventListener("click", buyDamageUpgrade);
 openShopButton.addEventListener("click", () => {
   homeShopPanel.classList.toggle("hidden");
 });
@@ -1003,9 +1081,12 @@ adminAddCoinsButton.addEventListener("click", () => {
 adminMaxDamageButton.addEventListener("click", () => {
   if (!requireOwner()) return;
   player.damageBoost = 100;
+  player.hpBoost = 200;
+  player.shieldBoost = 12;
+  player.coinBoost = 5;
   savePlayer();
   updatePlayerHud();
-  setAdminMessage("Damage boost set to +100.");
+  setAdminMessage("Owner upgrades maxed for testing.");
 });
 adminFillDemoButton.addEventListener("click", () => {
   if (!requireOwner()) return;
@@ -1017,6 +1098,9 @@ adminResetButton.addEventListener("click", () => {
   if (!requireOwner()) return;
   player.coins = 0;
   player.damageBoost = 0;
+  player.hpBoost = 0;
+  player.shieldBoost = 0;
+  player.coinBoost = 0;
   player.bossesDefeated = 0;
   savePlayer();
   updatePlayerHud();

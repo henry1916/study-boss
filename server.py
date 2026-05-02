@@ -54,6 +54,13 @@ def player_payload(account):
     avatar = default_avatar()
     avatar.update(player.get("avatar", {}))
     player["avatar"] = avatar
+    player["username"] = account.get("username", player.get("username", ""))
+    player["coins"] = int(player.get("coins", 0))
+    player["damageBoost"] = int(player.get("damageBoost", 0))
+    player["hpBoost"] = int(player.get("hpBoost", 0))
+    player["coinBoost"] = int(player.get("coinBoost", 0))
+    player["shieldBoost"] = int(player.get("shieldBoost", 0))
+    player["bossesDefeated"] = int(player.get("bossesDefeated", 0))
     account["player"] = player
     return player
 
@@ -145,6 +152,9 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                 "username": username,
                 "coins": 0,
                 "damageBoost": 0,
+                "hpBoost": 0,
+                "coinBoost": 0,
+                "shieldBoost": 0,
                 "bossesDefeated": 0,
                 "avatar": default_avatar(),
             },
@@ -170,6 +180,9 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             "username": account["username"],
             "coins": int(player.get("coins", 0)),
             "damageBoost": int(player.get("damageBoost", 0)),
+            "hpBoost": int(player.get("hpBoost", 0)),
+            "coinBoost": int(player.get("coinBoost", 0)),
+            "shieldBoost": int(player.get("shieldBoost", 0)),
             "bossesDefeated": int(player.get("bossesDefeated", 0)),
             "avatar": {
                 "color": str(player.get("avatar", {}).get("color", default_avatar()["color"])),
