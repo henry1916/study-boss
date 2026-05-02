@@ -1,0 +1,56 @@
+{
+  "accounts": {
+    "test-player": {
+      "username": "test-player",
+      "email": "",
+      "passwordHash": "f848f53fb843681bf20cc72c6ebf0d3ac007175e5a7d4752ce3c368948997b04",
+      "createdAt": 1777744984,
+      "player": {
+        "username": "test-player",
+        "coins": 0,
+        "damageBoost": 0,
+        "bossesDefeated": 0
+      }
+    },
+    "testacc": {
+      "username": "testacc",
+      "email": "",
+      "passwordHash": "67638b5685cd84fd25b0b7d43f00a129e02bc6849c222d879508fa0040dd20b3",
+      "createdAt": 1777745020,
+      "player": {
+        "username": "testacc",
+        "coins": 0,
+        "damageBoost": 0,
+        "bossesDefeated": 0
+      }
+    },
+    "email-test-user": {
+      "username": "email-test-user",
+      "email": "email-test@example.com",
+      "passwordHash": "e99676f844acfb39b8945d199f29f668056bda65590f16c1010cf754f649c0b0",
+      "createdAt": 1777745225,
+      "player": {
+        "username": "email-test-user",
+        "coins": 0,
+        "damageBoost": 0,
+        "bossesDefeated": 0
+      }
+    },
+    "owner": {
+      "username": "owner",
+      "email": "henryelliott31@gmail.com",
+      "passwordHash": "1b74b96db2dcdafe25384bfdcdf0ae9c320671eb7acd8a1fb088e4f66b86c073",
+      "createdAt": 1777745551,
+      "player": {
+        "username": "owner",
+        "coins": 31,
+        "damageBoost": 0,
+        "bossesDefeated": 0,
+        "avatar": {
+          "color": "#f5c451",
+          "heroClass": "rogue"
+        }
+      }
+    }
+  }
+}

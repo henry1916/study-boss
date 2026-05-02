@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Study Boss</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2317251f'/%3E%3Crect x='7' y='7' width='50' height='50' rx='8' fill='none' stroke='%2352d1a8' stroke-width='3'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial,sans-serif' font-size='22' font-weight='900' fill='%2352d1a8'%3ESB%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="auth-screen" id="authScreen">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">SB</div>
+          <span>Study Boss</span>
+        </div>
+        <div class="auth-layout">
+          <section class="auth-panel">
+            <p class="eyebrow">Player account</p>
+            <h1>Save your study hero.</h1>
+            <p class="intro">
+              Sign in with your username or email. Sign up once to save coins, upgrades,
+              and boss wins across browsers on this computer.
+            </p>
+            <div class="auth-tabs" role="tablist" aria-label="Account mode">
+              <button class="active" id="showSigninButton" type="button">Sign In</button>
+              <button id="showSignupButton" type="button">Sign Up</button>
+            </div>
+
+            <div id="signinForm">
+              <label class="notes-label" for="loginInput">Username or email</label>
+              <input id="loginInput" class="text-input" autocomplete="username" placeholder="shadowScholar or you@example.com" />
+
+              <label class="notes-label" for="signinPasswordInput">Password</label>
+              <input id="signinPasswordInput" class="text-input" type="password" autocomplete="current-password" placeholder="Your password" />
+
+              <div class="input-actions">
+                <button class="summon-button" id="signinButton" type="button">Sign In</button>
+                <button class="secondary-button" id="guestButton" type="button">Play as Guest</button>
+              </div>
+            </div>
+
+            <div id="signupForm" class="hidden">
+              <label class="notes-label" for="usernameInput">Username</label>
+              <input id="usernameInput" class="text-input" autocomplete="username" placeholder="shadowScholar" />
+
+              <label class="notes-label" for="emailInput">Email optional</label>
+              <input id="emailInput" class="text-input" type="email" autocomplete="email" placeholder="you@example.com" />
+
+              <label class="notes-label" for="passwordInput">Password</label>
+              <input id="passwordInput" class="text-input" type="password" autocomplete="new-password" placeholder="Make it memorable" />
+
+              <div class="input-actions">
+                <button class="summon-button" id="signupButton" type="button">Sign Up</button>
+                <button class="secondary-button" id="guestButtonSignup" type="button">Play as Guest</button>
+              </div>
+            </div>
+
+            <p class="error-message" id="authMessage" role="alert"></p>
+          </section>
+          <aside class="auth-card">
+            <span class="rank-badge">Level 1</span>
+            <h2>Novice Note Knight</h2>
+            <div class="loadout-row">
+              <span>Blade</span>
+              <strong>Pencil Saber</strong>
+            </div>
+            <div class="loadout-row">
+              <span>Power</span>
+              <strong>Recall Strike</strong>
+            </div>
+            <div class="loadout-row">
+              <span>Quest</span>
+              <strong>Defeat your first boss</strong>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="start-screen hidden" id="startScreen">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">SB</div>
+          <span>Study Boss</span>
+          <div class="account-pill">
+            <div class="mini-avatar" id="miniAvatar" aria-hidden="true"></div>
+            <span id="playerName">Guest</span>
+            <button class="admin-toggle hidden" id="adminToggleButton" type="button" title="Owner admin panel" aria-label="Owner admin panel">▹_</button>
+            <button id="signoutButton" type="button">Sign out</button>
+          </div>
+        </div>
+
+        <div class="summon-layout">
+          <section class="summon-panel">
+            <p class="eyebrow">Quest board</p>
+            <h1>Drop your notes to summon a boss.</h1>
+            <p class="intro">
+              Paste class notes, study guides, or assignment text. The app turns your
+              material into a monster battle where answers do damage.
+            </p>
+
+            <div class="quest-strip">
+              <span>Daily quest: Defeat 1 boss</span>
+              <span>Reward: coins + upgrade power</span>
+            </div>
+
+            <label class="notes-label" for="notesInput">Your notes</label>
+            <textarea
+              id="notesInput"
+              spellcheck="true"
+              placeholder="Paste notes here. Example: Photosynthesis is the process plants use to turn sunlight, carbon dioxide, and water into glucose and oxygen."
+            ></textarea>
+
+            <div class="input-actions">
+              <label class="file-button" for="fileInput">Upload .txt</label>
+              <input id="fileInput" type="file" accept=".txt,.md,.csv" />
+              <button class="secondary-button" id="demoButton" type="button">Use demo notes</button>
+              <button class="shop-button" id="openShopButton" type="button">Shop</button>
+            </div>
+
+            <section class="shop-panel shop-panel-home hidden" id="homeShopPanel" aria-label="Shop">
+              <div>
+                <p class="eyebrow">Shop</p>
+                <h3>Upgrade your recall strike</h3>
+                <p id="homeShopCopy">Spend coins to make every answer hit harder.</p>
+              </div>
+              <button class="secondary-button" id="homeBuyDamageButton" type="button">
+                Buy +5 Damage
+              </button>
+            </section>
+
+            <section class="avatar-panel" aria-label="Avatar customizer">
+              <div class="avatar-display" id="avatarDisplay">
+                <div class="avatar-head"></div>
+                <div class="avatar-body"></div>
+              </div>
+              <div>
+                <p class="eyebrow">Avatar</p>
+                <h3>Customize your hero</h3>
+                <div class="avatar-options" id="avatarColorOptions" aria-label="Avatar color"></div>
+                <div class="avatar-options" id="avatarClassOptions" aria-label="Avatar class"></div>
+              </div>
+            </section>
+
+            <section class="admin-panel hidden" id="adminPanel" aria-label="Owner admin panel">
+              <div>
+                <p class="eyebrow">▹_ Owner Tools</p>
+                <h3>Testing panel</h3>
+                <p>Only the `owner` account can see these shortcuts. Battle test controls appear during fights.</p>
+              </div>
+              <div class="admin-actions">
+                <button class="secondary-button" id="adminAddCoinsButton" type="button">Add 250 Coins</button>
+                <button class="secondary-button" id="adminMaxDamageButton" type="button">Max Damage</button>
+                <button class="secondary-button" id="adminFillDemoButton" type="button">Fill Demo Notes</button>
+                <button class="secondary-button danger-button" id="adminResetButton" type="button">Reset Owner Progress</button>
+              </div>
+              <p class="admin-message" id="adminMessage"></p>
+            </section>
+
+            <button class="summon-button" id="summonButton" type="button">
+              Summon Boss
+            </button>
+            <section class="setup-panel hidden" id="battleSetupPanel" aria-label="Battle setup">
+              <div>
+                <p class="eyebrow">Battle setup</p>
+                <h3>Choose your fight settings</h3>
+              </div>
+              <div class="setup-grid">
+                <label>
+                  Questions
+                  <input id="questionCountInput" class="text-input" type="number" min="1" max="50" value="15" />
+                </label>
+                <label>
+                  Hero HP
+                  <input id="playerHpInput" class="text-input" type="number" min="1" max="999" value="100" />
+                </label>
+                <label>
+                  Boss HP
+                  <input id="bossHpInput" class="text-input" type="number" min="1" max="9999" value="200" />
+                </label>
+              </div>
+              <button class="summon-button" id="startBattleButton" type="button">
+                Start Battle
+              </button>
+            </section>
+            <p class="error-message" id="errorMessage" role="alert"></p>
+          </section>
+
+          <aside class="monster-preview" aria-label="Monster preview">
+            <div class="moon"></div>
+            <svg viewBox="0 0 280 280" role="img" aria-label="A note-powered monster waiting to battle">
+              <defs>
+                <linearGradient id="monsterGrad" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#52d1a8" />
+                  <stop offset="100%" stop-color="#2978a0" />
+                </linearGradient>
+              </defs>
+              <path class="tail" d="M74 156 C28 147 32 91 73 82 C53 112 68 135 101 140 Z" />
+              <path class="horn left" d="M96 76 L80 32 L121 62 Z" />
+              <path class="horn right" d="M184 76 L200 32 L159 62 Z" />
+              <path class="body" d="M57 142 C57 79 96 50 142 50 C191 50 225 83 225 143 C225 205 187 240 139 240 C91 240 57 205 57 142 Z" />
+              <circle class="eye" cx="111" cy="127" r="13" />
+              <circle class="eye" cx="171" cy="127" r="13" />
+              <circle class="pupil" cx="115" cy="130" r="5" />
+              <circle class="pupil" cx="167" cy="130" r="5" />
+              <path class="mouth" d="M112 172 C132 190 154 190 174 172" />
+              <path class="tooth" d="M132 177 L140 195 L148 177 Z" />
+              <path class="page" d="M98 205 L181 198 L188 229 L105 236 Z" />
+              <path class="page-line" d="M114 216 L165 211" />
+              <path class="page-line" d="M117 226 L169 221" />
+            </svg>
+            <div class="preview-caption">
+              <strong>Monster fights are generated from your notes.</strong>
+              <span>Correct answers strike. Missed ideas become shields.</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="battle-screen hidden" id="battleScreen" aria-live="polite">
+        <header class="battle-header">
+          <button class="icon-button" id="backButton" type="button" aria-label="Back to notes">←</button>
+          <div>
+            <p class="eyebrow">Boss battle</p>
+            <h2 id="bossName">The Note Beast</h2>
+          </div>
+          <div class="stat-row">
+            <div class="xp-box">
+              <span>Hero HP</span>
+              <strong id="playerHealthText">100</strong>
+            </div>
+            <div class="xp-box">
+              <span>XP</span>
+              <strong id="xpValue">0</strong>
+            </div>
+            <div class="xp-box">
+              <span>Coins</span>
+              <strong id="coinValue">0</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="battle-grid">
+          <section class="arena">
+            <div class="boss-stage">
+              <div class="damage-pop" id="damagePop"></div>
+              <div class="attack-pop" id="attackPop"></div>
+              <div class="boss-sprite" id="bossSprite" aria-hidden="true">
+                <div class="boss-horn horn-a"></div>
+                <div class="boss-horn horn-b"></div>
+                <div class="boss-eye eye-a"></div>
+                <div class="boss-eye eye-b"></div>
+                <div class="boss-brow brow-a"></div>
+                <div class="boss-brow brow-b"></div>
+                <div class="boss-mouth"></div>
+                <div class="boss-sword"></div>
+              </div>
+              <div class="hero-sprite" id="heroSprite" aria-hidden="true">
+                <div class="avatar-head">
+                  <div class="hero-eye hero-eye-a"></div>
+                  <div class="hero-eye hero-eye-b"></div>
+                  <div class="hero-brow hero-brow-a"></div>
+                  <div class="hero-brow hero-brow-b"></div>
+                  <div class="hero-mouth"></div>
+                </div>
+                <div class="avatar-body"></div>
+                <div class="hero-sword"></div>
+              </div>
+              <div class="health-block">
+                <div class="health-label">
+                  <span id="bossTitle">Boss</span>
+                  <strong id="healthText">100 / 100</strong>
+                </div>
+                <div class="health-bar">
+                  <div id="healthFill"></div>
+                </div>
+                <div class="health-label player-health-label">
+                  <span>Hero HP</span>
+                  <strong id="playerHealthDetail">100 / 100</strong>
+                </div>
+                <div class="health-bar player-health-bar">
+                  <div id="playerHealthFill"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="question-panel">
+            <div class="round-meta">
+              <span id="roundText">Round 1</span>
+              <span id="topicText">Topic</span>
+            </div>
+            <div class="battle-banner" id="battleBanner">Choose your attack.</div>
+            <div class="dev-battle-controls hidden" id="devBattleControls">
+              <span>▹_ owner test</span>
+              <button class="secondary-button" id="devCorrectButton" type="button">Force Right</button>
+              <button class="secondary-button danger-button" id="devWrongButton" type="button">Force Wrong</button>
+            </div>
+            <h3 id="questionText">Question</h3>
+            <div id="answerOptions" class="answer-options"></div>
+            <textarea
+              id="typedAnswer"
+              class="typed-answer hidden"
+              placeholder="Type your answer from memory..."
+            ></textarea>
+            <div class="battle-actions">
+              <button class="secondary-button" id="hintButton" type="button">Hint</button>
+              <button class="summon-button" id="submitButton" type="button">Attack</button>
+              <button class="secondary-button hidden" id="nextButton" type="button">Next</button>
+            </div>
+            <p class="feedback" id="feedbackText"></p>
+          </section>
+        </div>
+
+        <section class="results-panel hidden" id="resultsPanel">
+          <h2 id="resultTitle">Boss defeated</h2>
+          <p id="resultCopy"></p>
+          <div class="reward-strip">
+            <div>
+              <span>Coins earned</span>
+              <strong id="earnedCoins">0</strong>
+            </div>
+            <div>
+              <span>Damage boost</span>
+              <strong id="boostValue">+0</strong>
+            </div>
+          </div>
+          <div class="weak-list" id="weakList"></div>
+          <section class="shop-panel" aria-label="Shop">
+            <div>
+              <p class="eyebrow">Shop</p>
+              <h3>Buy stronger attacks</h3>
+              <p id="shopCopy">Spend coins to make every future answer hit harder.</p>
+            </div>
+            <button class="secondary-button" id="buyDamageButton" type="button">
+              Buy +5 Damage
+            </button>
+          </section>
+          <button class="summon-button" id="rematchButton" type="button">Summon Another Boss</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
