@@ -111,9 +111,10 @@ let game = {
   misses: []
 };
 
+const allowLocalAccountFallback = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
 let activeProfile = localStorage.getItem("studyBossActiveProfile") || "";
 let player = loadPlayer(activeProfile);
-let serverBackedProfile = false;
+let serverBackedProfile = Boolean(activeProfile && activeProfile !== "guest" && !allowLocalAccountFallback);
 let pendingNotes = "";
 
 const stopwords = new Set([
@@ -169,12 +170,18 @@ function loadPlayer(username) {
 
 function savePlayer() {
   localStorage.setItem(profileKey(activeProfile), JSON.stringify(player));
-  if (serverBackedProfile && activeProfile && activeProfile !== "guest") {
+  const shouldSaveToServer = activeProfile && activeProfile !== "guest" && (serverBackedProfile || !allowLocalAccountFallback);
+  if (shouldSaveToServer) {
     fetch("/api/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: activeProfile, player })
+    }).then((response) => {
+      if (!response.ok) {
+        console.warn("Study Boss save failed", response.status);
+      }
     }).catch(() => {
+      console.warn("Study Boss could not reach the save server.");
       localStorage.setItem(profileKey(activeProfile), JSON.stringify(player));
     });
   }
@@ -245,6 +252,10 @@ async function signIn() {
     signinPasswordInput.value = "";
     showStartScreen();
   } catch {
+    if (!allowLocalAccountFallback) {
+      authMessage.textContent = "Could not reach the account server. Try again in a minute.";
+      return;
+    }
     const key = accountKey(login);
     const existing = JSON.parse(localStorage.getItem(key) || "null");
     if (!existing) {
@@ -300,6 +311,10 @@ async function signUp() {
     passwordInput.value = "";
     showStartScreen();
   } catch {
+    if (!allowLocalAccountFallback) {
+      authMessage.textContent = "Could not reach the account server. Try again in a minute.";
+      return;
+    }
     const key = accountKey(username);
     if (localStorage.getItem(key)) {
       authMessage.textContent = "That username already exists locally. Sign in instead.";
