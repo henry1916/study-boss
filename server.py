@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import random
 import re
 import time
 from urllib import error, request
@@ -21,7 +22,7 @@ DB_PATH = ROOT / "study_boss_db.json"
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DEFAULT_AVATAR_COLORS = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff", "#ff8f3d", "#ffffff", "#111111"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 ANSWER_STOPWORDS = {
     "the", "and", "that", "this", "with", "from", "into", "where", "what",
     "which", "their", "there", "about", "have", "has", "are", "was", "were",
@@ -212,23 +213,24 @@ def clean_question(item, index):
 
     if question_type in {"multiple_choice", "choice"}:
         options = [str(option).strip() for option in options if str(option).strip()]
-        if answer not in options:
-            options.insert(0, answer)
         seen = set()
-        unique_options = []
+        unique_options = [answer]
+        seen.add(answer.lower())
         for option in options:
             key = option.lower()
             if key in seen:
                 continue
             seen.add(key)
             unique_options.append(option)
-        if len(unique_options) < 2:
+        if len(unique_options) < 4:
             return None
+        cleaned_options = [answer, *unique_options[1:4]]
+        random.shuffle(cleaned_options)
         return {
             "type": "choice",
             "prompt": prompt,
             "answer": answer,
-            "options": unique_options[:4],
+            "options": cleaned_options,
             "source": source or hint,
             "hint": hint,
             "topic": topic,
@@ -252,7 +254,7 @@ def generate_questions_with_groq(notes, count):
         raise RuntimeError("GROQ_API_KEY is not set.")
 
     prompt = f"""
-Create exactly {count} study game questions from the notes.
+Create exactly {count} study game questions from the notes for a middle/high school student.
 Return only valid JSON. No markdown.
 Use this shape:
 {{"questions":[{{"type":"choice","topic":"...","prompt":"...","options":["...","...","...","..."],"answer":"...","hint":"...","source":"short quote from notes","explanation":"..."}}]}}
@@ -260,18 +262,23 @@ Use this shape:
 Rules:
 - Make about 75 percent multiple-choice questions and about 25 percent open-response questions.
 - Multiple-choice questions must include exactly 4 options and exactly one correct answer.
-- Open-response questions must use type "typed", include answer as a short ideal answer, and include hint/source.
+- Open-response questions must use type "typed", include answer as a short ideal answer of 2 to 12 words, and include hint/source.
+- If the notes are short, make different question styles from the same note facts instead of inventing new facts.
 - Make distractors believable but clearly wrong.
-- Keep questions natural, student-friendly, and less robotic.
+- Write prompts like a helpful study buddy, not a textbook or test-prep robot.
+- Keep wording short and conversational. Good: "What job does chlorophyll do?" Bad: "What is the primary function..."
 - Ask about meaning, cause/effect, location, purpose, and relationships, not just copied definitions.
+- Use class-note language from the notes, but do not copy an entire sentence as the question.
 - Avoid repeating the same concept unless the notes are very short.
 - Use only facts found in the notes.
-- source must be a short quote or close paraphrase from the notes that proves the answer.
-- explanation should briefly explain why the answer is correct.
+- source must be a short quote from the notes, and it should contain the answer or the answer's main words.
+- explanation should briefly explain why the answer is correct in friendly language.
+- Hints should nudge without giving away the answer.
 - No "all of the above" or joke answers.
 - Do not make the correct option much longer or more detailed than every distractor.
 - Do not include duplicate options or options that are basically the same.
 - Do not ask vague questions like "What should you remember?"
+- Do not invent facts or use outside knowledge, even if the answer seems obvious.
 
 Notes:
 {notes[:12000]}
