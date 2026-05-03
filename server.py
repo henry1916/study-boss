@@ -3,7 +3,9 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import re
 import time
+from urllib import error, request
 
 try:
     import psycopg2
@@ -18,6 +20,14 @@ ROOT = Path(__file__).parent
 DB_PATH = ROOT / "study_boss_db.json"
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DEFAULT_AVATAR_COLORS = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff", "#ff8f3d", "#ffffff", "#111111"]
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
+ANSWER_STOPWORDS = {
+    "the", "and", "that", "this", "with", "from", "into", "where", "what",
+    "which", "their", "there", "about", "have", "has", "are", "was", "were",
+    "they", "them", "then", "than", "for", "use", "uses", "used", "using",
+    "your", "you", "can", "will", "more", "most", "does", "help", "make",
+}
 
 
 def use_postgres():
@@ -167,6 +177,152 @@ def default_avatar():
     return {"color": "#52d1a8", "heroClass": "knight", "accessory": "none"}
 
 
+def important_answer_words(text):
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return [word for word in words if len(word) > 2 and word not in ANSWER_STOPWORDS]
+
+
+def answer_is_supported(answer, proof):
+    answer_words = important_answer_words(answer)
+    if not answer_words:
+        return False
+    proof_text = proof.lower()
+    hits = sum(1 for word in answer_words if word in proof_text)
+    return hits >= max(1, min(2, len(answer_words)))
+
+
+def clean_question(item, index):
+    question_type = str(item.get("type", "choice")).strip().lower()
+    topic = str(item.get("topic", "Study notes")).strip()[:80] or "Study notes"
+    prompt = str(item.get("prompt") or item.get("question") or "").strip()
+    answer = str(item.get("answer") or item.get("correct_answer") or item.get("ideal_answer") or "").strip()
+    source = str(item.get("source") or item.get("source_quote") or item.get("explanation") or "").strip()
+    hint = str(item.get("hint") or item.get("explanation") or f"Review the note about {topic}.").strip()
+
+    options = item.get("options") or item.get("choices") or []
+    if question_type in {"multiple_choice", "choice"} and not answer and isinstance(item.get("correct_choice_index"), int):
+        index = item["correct_choice_index"]
+        if isinstance(options, list) and 0 <= index < len(options):
+            answer = str(options[index]).strip()
+
+    if not prompt or not answer:
+        return None
+    if source and not answer_is_supported(answer, f"{source} {hint}"):
+        return None
+
+    if question_type in {"multiple_choice", "choice"}:
+        options = [str(option).strip() for option in options if str(option).strip()]
+        if answer not in options:
+            options.insert(0, answer)
+        seen = set()
+        unique_options = []
+        for option in options:
+            key = option.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_options.append(option)
+        if len(unique_options) < 2:
+            return None
+        return {
+            "type": "choice",
+            "prompt": prompt,
+            "answer": answer,
+            "options": unique_options[:4],
+            "source": source or hint,
+            "hint": hint,
+            "topic": topic,
+        }
+
+    accepted = item.get("accepted_answers") or []
+    if isinstance(accepted, list) and accepted:
+        answer = str(accepted[0]).strip() or answer
+    return {
+        "type": "typed",
+        "prompt": prompt,
+        "answer": answer,
+        "source": source or hint,
+        "hint": hint,
+        "topic": topic,
+    }
+
+
+def generate_questions_with_groq(notes, count):
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is not set.")
+
+    prompt = f"""
+Create exactly {count} study game questions from the notes.
+Return only valid JSON. No markdown.
+Use this shape:
+{{"questions":[{{"type":"choice","topic":"...","prompt":"...","options":["...","...","...","..."],"answer":"...","hint":"...","source":"short quote from notes","explanation":"..."}}]}}
+
+Rules:
+- Make about 75 percent multiple-choice questions and about 25 percent open-response questions.
+- Multiple-choice questions must include exactly 4 options and exactly one correct answer.
+- Open-response questions must use type "typed", include answer as a short ideal answer, and include hint/source.
+- Make distractors believable but clearly wrong.
+- Keep questions natural, student-friendly, and less robotic.
+- Ask about meaning, cause/effect, location, purpose, and relationships, not just copied definitions.
+- Avoid repeating the same concept unless the notes are very short.
+- Use only facts found in the notes.
+- source must be a short quote or close paraphrase from the notes that proves the answer.
+- explanation should briefly explain why the answer is correct.
+- No "all of the above" or joke answers.
+- Do not make the correct option much longer or more detailed than every distractor.
+- Do not include duplicate options or options that are basically the same.
+- Do not ask vague questions like "What should you remember?"
+
+Notes:
+{notes[:12000]}
+""".strip()
+
+    payload = {
+        "model": GROQ_MODEL,
+        "temperature": 0.4,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {
+                "role": "system",
+                "content": "You write reliable quiz cards for a student study game. Return compact valid JSON only.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+    }
+    body = json.dumps(payload).encode()
+    req = request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+            "User-Agent": "StudyBoss/1.0",
+        },
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(req, timeout=25) as response:
+            result = json.loads(response.read().decode())
+    except error.HTTPError as exc:
+        details = exc.read().decode(errors="ignore")[:500]
+        raise RuntimeError(f"Groq returned {exc.code}: {details}") from exc
+
+    content = result["choices"][0]["message"]["content"]
+    parsed = json.loads(content)
+    raw_questions = parsed.get("questions", parsed if isinstance(parsed, list) else [])
+    questions = []
+    for index, item in enumerate(raw_questions):
+        if not isinstance(item, dict):
+            continue
+        question = clean_question(item, index)
+        if question:
+            questions.append(question)
+    if not questions:
+        raise RuntimeError("Groq did not return usable questions.")
+    return questions[:count]
+
+
 def player_payload(account):
     player = account.get("player", {})
     avatar = default_avatar()
@@ -213,6 +369,9 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/save":
             self.handle_save()
+            return
+        if self.path == "/api/generate-questions":
+            self.handle_generate_questions()
             return
         self.send_json(404, {"ok": False, "error": "Unknown endpoint"})
 
@@ -316,6 +475,22 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         }
         save_account(account)
         self.send_json(200, {"ok": True, "player": account["player"]})
+
+    def handle_generate_questions(self):
+        data = self.read_json()
+        notes = " ".join(str(data.get("notes", "")).strip().split())
+        count = int(data.get("count", 15) or 15)
+        count = min(50, max(1, count))
+        if len(notes) < 80:
+            self.send_json(400, {"ok": False, "error": "Add more notes first."})
+            return
+        try:
+            questions = generate_questions_with_groq(notes, count)
+        except Exception as exc:
+            print(f"Groq question generation failed: {exc}", flush=True)
+            self.send_json(503, {"ok": False, "error": "AI question generation failed."})
+            return
+        self.send_json(200, {"ok": True, "questions": questions, "model": GROQ_MODEL})
 
 
 if __name__ == "__main__":

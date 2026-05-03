@@ -830,6 +830,36 @@ function buildQuestions(notes, count = 15) {
   return questions;
 }
 
+async function buildQuestionsWithAi(notes, count) {
+  const response = await fetch("/api/generate-questions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ notes, count })
+  });
+  if (!response.ok) {
+    throw new Error("AI question generation failed.");
+  }
+  const result = await response.json();
+  if (!result.ok || !Array.isArray(result.questions)) {
+    throw new Error("AI returned an invalid quiz.");
+  }
+  return result.questions;
+}
+
+function fillQuestionGaps(questions, notes, count) {
+  if (questions.length >= count) return questions.slice(0, count);
+  const used = new Set(questions.map((question) => normalize(`${question.prompt} ${question.answer}`)));
+  const fallbackQuestions = buildQuestions(notes, count);
+  fallbackQuestions.forEach((question) => {
+    if (questions.length >= count) return;
+    const key = normalize(`${question.prompt} ${question.answer}`);
+    if (used.has(key)) return;
+    used.add(key);
+    questions.push(question);
+  });
+  return questions.slice(0, count);
+}
+
 function prepareBattle() {
   const notes = cleanText(notesInput.value);
   if (notes.length < 80) {
@@ -842,12 +872,25 @@ function prepareBattle() {
   errorMessage.textContent = "";
 }
 
-function startBattle() {
+async function startBattle() {
   const notes = pendingNotes || cleanText(notesInput.value);
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
   const playerHp = readNumber(playerHpInput, 100, 1, 999);
   const bossHp = readNumber(bossHpInput, 200, 1, 9999);
-  const questions = buildQuestions(notes, questionCount);
+  startBattleButton.disabled = true;
+  startBattleButton.textContent = "Building questions...";
+  let questions;
+  try {
+    questions = await buildQuestionsWithAi(notes, questionCount);
+    questions = fillQuestionGaps(questions, notes, questionCount);
+    battleBanner.textContent = "A wild study boss appears. Choose your attack.";
+  } catch {
+    questions = buildQuestions(notes, questionCount);
+    battleBanner.textContent = "A wild study boss appears. Choose your attack.";
+  } finally {
+    startBattleButton.disabled = false;
+    startBattleButton.textContent = "Start Battle";
+  }
   if (!questions.length) {
     errorMessage.textContent = "I could not find enough study facts. Try pasting complete sentences.";
     return;
@@ -872,7 +915,6 @@ function startBattle() {
   bossTitle.textContent = game.boss;
   xpValue.textContent = "0";
   updatePlayerHud();
-  battleBanner.textContent = "A wild study boss appears. Choose your attack.";
   errorMessage.textContent = "";
   battleSetupPanel.classList.add("hidden");
   startScreen.classList.add("hidden");
