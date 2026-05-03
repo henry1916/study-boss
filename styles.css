@@ -1071,6 +1071,7 @@ textarea:focus,
 
 .avatar-display.star .avatar-accessory,
 .hero-sprite.star .avatar-accessory {
+  top: -22px;
   width: 34px;
   height: 34px;
   background: var(--gold);
@@ -1126,7 +1127,7 @@ textarea:focus,
 
 .avatar-display.spark .avatar-accessory,
 .hero-sprite.spark .avatar-accessory {
-  top: -18px;
+  top: -30px;
   width: 38px;
   height: 38px;
   background: #8ee7ff;
