@@ -150,6 +150,7 @@ button {
 }
 
 .mini-avatar {
+  position: relative;
   width: 26px;
   height: 26px;
   border: 2px solid var(--gold);
@@ -158,8 +159,56 @@ button {
   box-shadow: inset -6px -6px 0 rgba(0, 0, 0, 0.18);
 }
 
+.mini-avatar.crown::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  width: 24px;
+  height: 13px;
+  background: var(--gold);
+  clip-path: polygon(0 100%, 12% 35%, 34% 82%, 50% 0, 66% 82%, 88% 35%, 100% 100%);
+  transform: translateX(-50%);
+}
+
+.mini-avatar.halo::before,
+.mini-avatar.star::before,
+.mini-avatar.spark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.mini-avatar.halo::before {
+  top: -11px;
+  width: 26px;
+  height: 8px;
+  border: 3px solid #f8f0b4;
+  border-radius: 50%;
+}
+
+.mini-avatar.star::before,
+.mini-avatar.spark::before {
+  top: -10px;
+  width: 16px;
+  height: 16px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 91%, 50% 69%, 21% 91%, 32% 56%, 2% 35%, 39% 34%);
+}
+
+.mini-avatar.spark::before {
+  background: #8ee7ff;
+}
+
 .account-pill span {
   color: var(--gold);
+}
+
+#playerLevel {
+  color: var(--green);
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .account-pill button {
@@ -988,6 +1037,103 @@ textarea:focus,
   height: 104px;
 }
 
+.avatar-accessory {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  z-index: 4;
+  width: 60px;
+  height: 28px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.avatar-display.crown .avatar-accessory,
+.hero-sprite.crown .avatar-accessory {
+  background: var(--gold);
+  clip-path: polygon(0 100%, 12% 35%, 34% 82%, 50% 0, 66% 82%, 88% 35%, 100% 100%);
+}
+
+.avatar-display.headband .avatar-accessory,
+.hero-sprite.headband .avatar-accessory {
+  height: 10px;
+  border-radius: 999px;
+  background: #ff5f6d;
+}
+
+.avatar-display.headband .avatar-accessory {
+  top: 6px;
+}
+
+.hero-sprite.headband .avatar-accessory {
+  top: 10px;
+}
+
+.avatar-display.star .avatar-accessory,
+.hero-sprite.star .avatar-accessory {
+  width: 34px;
+  height: 34px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 91%, 50% 69%, 21% 91%, 32% 56%, 2% 35%, 39% 34%);
+}
+
+.avatar-display.wizardHat .avatar-accessory,
+.hero-sprite.wizardHat .avatar-accessory {
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(135deg, #7657ff, #2d8cff);
+  clip-path: polygon(50% 0, 70% 62%, 100% 78%, 50% 100%, 0 78%, 30% 62%);
+}
+
+.avatar-display.wizardHat .avatar-accessory {
+  top: -50px;
+}
+
+.hero-sprite.wizardHat .avatar-accessory {
+  top: -58px;
+}
+
+.avatar-display.halo .avatar-accessory,
+.hero-sprite.halo .avatar-accessory {
+  top: -14px;
+  width: 58px;
+  height: 18px;
+  border: 5px solid #f8f0b4;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 18px rgba(248, 240, 180, 0.7);
+}
+
+.avatar-display.visor .avatar-accessory,
+.hero-sprite.visor .avatar-accessory {
+  top: 20px;
+  width: 54px;
+  height: 17px;
+  border-radius: 999px 999px 10px 10px;
+  background: linear-gradient(90deg, #14202a, #55e0ff 48%, #14202a);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+}
+
+.avatar-display.laurel .avatar-accessory,
+.hero-sprite.laurel .avatar-accessory {
+  top: -3px;
+  width: 64px;
+  height: 34px;
+  border-left: 8px solid #7ee081;
+  border-right: 8px solid #7ee081;
+  border-radius: 50%;
+}
+
+.avatar-display.spark .avatar-accessory,
+.hero-sprite.spark .avatar-accessory {
+  top: -18px;
+  width: 38px;
+  height: 38px;
+  background: #8ee7ff;
+  filter: drop-shadow(0 0 10px rgba(142, 231, 255, 0.85));
+  clip-path: polygon(45% 0, 57% 35%, 94% 20%, 68% 52%, 100% 68%, 61% 70%, 55% 100%, 39% 73%, 5% 82%, 31% 53%, 0 35%, 37% 36%);
+}
+
 .avatar-head,
 .avatar-body {
   position: absolute;
@@ -1027,6 +1173,17 @@ textarea:focus,
 
 .avatar-head::after {
   right: 13px;
+}
+
+.avatar-display.dark-avatar .avatar-head::before,
+.avatar-display.dark-avatar .avatar-head::after,
+.hero-sprite.dark-avatar .hero-eye,
+.hero-sprite.dark-avatar .hero-brow {
+  background: var(--text);
+}
+
+.hero-sprite.dark-avatar .hero-mouth {
+  border-color: var(--text);
 }
 
 .avatar-body {
@@ -1108,6 +1265,11 @@ textarea:focus,
   height: 16px;
   border: 4px solid var(--ink);
   border-radius: 50%;
+}
+
+.hero-sprite.dark-avatar.angry .hero-mouth,
+.hero-sprite.dark-avatar.hurt-face .hero-mouth {
+  border-color: var(--text);
 }
 
 .avatar-display.mage .avatar-body,

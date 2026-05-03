@@ -16,15 +16,20 @@ const guestButton = document.querySelector("#guestButton");
 const guestButtonSignup = document.querySelector("#guestButtonSignup");
 const authMessage = document.querySelector("#authMessage");
 const playerName = document.querySelector("#playerName");
+const playerLevel = document.querySelector("#playerLevel");
 const signoutButton = document.querySelector("#signoutButton");
 const adminToggleButton = document.querySelector("#adminToggleButton");
 const notesInput = document.querySelector("#notesInput");
 const fileInput = document.querySelector("#fileInput");
 const demoButton = document.querySelector("#demoButton");
 const openShopButton = document.querySelector("#openShopButton");
+const openAvatarShopButton = document.querySelector("#openAvatarShopButton");
 const homeShopPanel = document.querySelector("#homeShopPanel");
 const homeShopCopy = document.querySelector("#homeShopCopy");
 const homeShopItems = document.querySelector("#homeShopItems");
+const avatarShopPanel = document.querySelector("#avatarShopPanel");
+const avatarShopCopy = document.querySelector("#avatarShopCopy");
+const avatarShopItems = document.querySelector("#avatarShopItems");
 const miniAvatar = document.querySelector("#miniAvatar");
 const avatarDisplay = document.querySelector("#avatarDisplay");
 const avatarColorOptions = document.querySelector("#avatarColorOptions");
@@ -87,9 +92,10 @@ The Calvin cycle uses carbon dioxide, ATP, and NADPH to make glucose.
 Cellular respiration breaks down glucose to release energy stored as ATP.
 Mitochondria are the organelles where most cellular respiration happens.`;
 
-const defaultAvatar = { color: "#52d1a8", heroClass: "knight" };
-const avatarColors = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff"];
+const defaultAvatar = { color: "#52d1a8", heroClass: "knight", accessory: "none" };
+const freeAvatarColors = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff", "#ff8f3d", "#ffffff", "#111111"];
 const avatarClasses = ["knight", "mage", "rogue", "tank"];
+const avatarAccessories = ["none", "crown", "headband", "star", "wizardHat", "halo", "visor", "laurel", "spark"];
 
 let game = {
   boss: "",
@@ -135,22 +141,28 @@ function loadPlayer(username) {
     const saved = JSON.parse(localStorage.getItem(profileKey(username)) || "{}");
     return {
       username: username || "Guest",
+      xp: Number(saved.xp ?? legacy.xp) || 0,
       coins: Number(saved.coins ?? legacy.coins) || 0,
       damageBoost: Number(saved.damageBoost ?? legacy.damageBoost) || 0,
       coinBoost: Number(saved.coinBoost ?? legacy.coinBoost) || 0,
       shieldBoost: Number(saved.shieldBoost ?? legacy.shieldBoost) || 0,
       bossesDefeated: Number(saved.bossesDefeated) || 0,
-      avatar: { ...defaultAvatar, ...(saved.avatar || legacy.avatar || {}) }
+      avatar: { ...defaultAvatar, ...(saved.avatar || legacy.avatar || {}) },
+      unlockedAvatarColors: saved.unlockedAvatarColors || legacy.unlockedAvatarColors || [...freeAvatarColors],
+      unlockedAccessories: saved.unlockedAccessories || legacy.unlockedAccessories || ["none"]
     };
   } catch {
     return {
       username: username || "Guest",
+      xp: 0,
       coins: 0,
       damageBoost: 0,
       coinBoost: 0,
       shieldBoost: 0,
       bossesDefeated: 0,
-      avatar: { ...defaultAvatar }
+      avatar: { ...defaultAvatar },
+      unlockedAvatarColors: [...freeAvatarColors],
+      unlockedAccessories: ["none"]
     };
   }
 }
@@ -362,6 +374,26 @@ const shopItems = [
   }
 ];
 
+const avatarStoreItems = [
+  { type: "accessory", id: "none", name: "No Accessory", description: "Keep your avatar clean and simple.", cost: 0 },
+  { type: "accessory", id: "crown", name: "Crown", description: "A golden crown for your hero.", cost: 75 },
+  { type: "accessory", id: "headband", name: "Headband", description: "A battle headband.", cost: 45 },
+  { type: "accessory", id: "star", name: "Star Pin", description: "A bright star accessory.", cost: 55 },
+  { type: "accessory", id: "wizardHat", name: "Wizard Hat", description: "A tall study-mage hat.", cost: 80 },
+  { type: "accessory", id: "halo", name: "Halo", description: "A glowing ring for perfect recall.", cost: 90 },
+  { type: "accessory", id: "visor", name: "Battle Visor", description: "A sharp visor for boss fights.", cost: 65 },
+  { type: "accessory", id: "laurel", name: "Laurel", description: "Champion leaves for win streaks.", cost: 70 },
+  { type: "accessory", id: "spark", name: "Spark Aura", description: "A little flash of answer power.", cost: 95 }
+];
+
+function levelForXp(xp) {
+  return Math.floor((Number(xp) || 0) / 100) + 1;
+}
+
+function xpForNextLevel(xp) {
+  return levelForXp(xp) * 100 - (Number(xp) || 0);
+}
+
 function upgradeCost(item) {
   return item.cost(Number(player[item.id]) || 0);
 }
@@ -369,6 +401,7 @@ function upgradeCost(item) {
 function updatePlayerHud() {
   player.avatar = { ...defaultAvatar, ...(player.avatar || {}) };
   playerName.textContent = player.username || "Guest";
+  playerLevel.textContent = `Level ${levelForXp(player.xp)}`;
   coinValue.textContent = String(player.coins);
   boostValue.textContent = `+${player.damageBoost}`;
   const cheapestUpgrade = Math.min(...shopItems.map((item) => upgradeCost(item)));
@@ -378,6 +411,7 @@ function updatePlayerHud() {
   homeShopCopy.textContent = shopCopy.textContent;
   renderShopItems(homeShopItems);
   renderShopItems(resultShopItems);
+  renderAvatarShopItems();
   adminToggleButton.classList.toggle("hidden", !isOwner());
   if (!isOwner()) {
     adminPanel.classList.add("hidden");
@@ -412,16 +446,57 @@ function renderShopItems(container) {
   });
 }
 
+function renderAvatarShopItems() {
+  avatarShopItems.innerHTML = "";
+  avatarShopCopy.textContent = `Accessories only. Colors stay free in the avatar editor. Level ${levelForXp(player.xp)}. ${xpForNextLevel(player.xp)} XP to next level.`;
+  avatarStoreItems.forEach((item) => {
+    const unlocked = player.unlockedAccessories.includes(item.id);
+    const card = document.createElement("div");
+    card.className = "shop-item";
+
+    const title = document.createElement("strong");
+    title.textContent = item.name;
+    const detail = document.createElement("span");
+    detail.textContent = unlocked ? "Unlocked" : `${item.cost} coins`;
+    const description = document.createElement("p");
+    description.textContent = item.description;
+    const button = document.createElement("button");
+    button.className = "secondary-button";
+    button.type = "button";
+    button.textContent = unlocked ? "Use" : `Buy (${item.cost})`;
+    button.disabled = !unlocked && player.coins < item.cost;
+    button.addEventListener("click", () => handleAvatarShopItem(item, unlocked));
+
+    card.append(title, detail, description, button);
+    avatarShopItems.append(card);
+  });
+}
+
+function handleAvatarShopItem(item, unlocked) {
+  if (!unlocked) {
+    if (player.coins < item.cost) return;
+    player.coins -= item.cost;
+    player.unlockedAccessories.push(item.id);
+  }
+  player.avatar = { ...defaultAvatar, ...(player.avatar || {}), accessory: item.id };
+  savePlayer();
+  updatePlayerHud();
+}
+
 function isOwner() {
   return (player.username || "").toLowerCase() === "owner";
 }
 
 function renderAvatar() {
   const avatar = { ...defaultAvatar, ...(player.avatar || {}) };
+  const darkAvatar = normalize(avatar.color) === "111111";
   [miniAvatar, avatarDisplay, heroSprite].forEach((element) => {
     element.style.setProperty("--avatar-color", avatar.color);
+    element.classList.toggle("dark-avatar", darkAvatar);
     element.classList.remove(...avatarClasses);
+    element.classList.remove(...avatarAccessories);
     element.classList.add(avatar.heroClass);
+    element.classList.add(avatar.accessory);
   });
 
   avatarColorOptions.querySelectorAll("button").forEach((button) => {
@@ -433,7 +508,7 @@ function renderAvatar() {
 }
 
 function buildAvatarOptions() {
-  avatarColors.forEach((color) => {
+  freeAvatarColors.forEach((color) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "avatar-option avatar-swatch";
@@ -549,33 +624,33 @@ function extractFact(sentence) {
     {
       kind: "location",
       regex: /^(.+?)\s+(?:happens|occurs|takes place)\s+(?:in|inside|at|on)\s+(.+?)\s+and\s+(?:produces|produce|creates|create|makes|make)\s+(.+)$/i,
-      prompt: (subject) => `Where does ${subject} happen?`,
+      prompt: (subject) => `Where should ${subject} go in your mental map of the notes?`,
       answerPart: 2
     },
     {
       kind: "definition",
       regex: /^(.+?)\s+(?:is|are|means|refers to)\s+(.+)$/i,
-      prompt: (subject) => `What is ${subject}?`
+      prompt: (subject) => `Which answer best explains ${subject}?`
     },
     {
       kind: "location",
       regex: /^(.+?)\s+(?:happens|occurs|takes place|is found|are found)\s+(?:in|inside|at|on)\s+(.+)$/i,
-      prompt: (subject) => `Where does ${subject} happen?`
+      prompt: (subject) => `Where do your notes place ${subject}?`
     },
     {
       kind: "function",
       regex: /^(.+?)\s+(?:uses|use)\s+(.+?)\s+to\s+(.+)$/i,
-      prompt: (subject, object) => `What does ${subject} use ${object} to do?`
+      prompt: (subject, object) => `What job is ${subject} doing with ${object}?`
     },
     {
       kind: "output",
       regex: /^(.+?)\s+(?:produces|produce|creates|create|makes|make)\s+(.+)$/i,
-      prompt: (subject) => `What does ${subject} produce?`
+      prompt: (subject) => `What comes out of ${subject}?`
     },
     {
       kind: "purpose",
       regex: /^(.+?)\s+(?:breaks down|converts|turns)\s+(.+?)\s+(?:to|into)\s+(.+)$/i,
-      prompt: (subject, object) => `Why does ${subject} break down ${object}?`
+      prompt: (subject, object) => `What is ${subject} trying to get from ${object}?`
     }
   ];
 
@@ -623,7 +698,7 @@ function makeTrueFalseQuestion(fact, allFacts, index) {
   const statementAnswer = useTrap ? replacement.answer : fact.answer;
   return {
     type: "choice",
-    prompt: `True or false: ${fact.subject} is connected to "${statementAnswer}".`,
+    prompt: `Quick check: do your notes support this? ${fact.subject} -> "${statementAnswer}".`,
     answer: useTrap ? "False" : "True",
     options: ["True", "False"],
     source: fact.source,
@@ -650,7 +725,7 @@ function makeFactQuestion(fact, allFacts, allWords, index) {
 }
 
 function makeReverseQuestion(fact, allFacts, allWords, index) {
-  const prompt = `Which topic matches this clue: "${fact.answer}"?`;
+  const prompt = `This clue points to which topic? "${fact.answer}"`;
   const options = shuffle([
     fact.subject,
     ...allFacts
@@ -673,7 +748,7 @@ function makeReverseQuestion(fact, allFacts, allWords, index) {
 function makeApplicationQuestion(fact) {
   return {
     type: "typed",
-    prompt: `Use your own words: why is ${fact.subject} important here?`,
+    prompt: `Explain ${fact.subject} in your own words. What should you remember?`,
     answer: fact.answer,
     source: fact.source,
     hint: `Use the idea: ${fact.answer}`,
@@ -694,7 +769,7 @@ function makeQuestion(fact, allFacts, allWords, index) {
   if (fact.kind === "recall" || cycle === 2) {
     return {
       type: "typed",
-      prompt: fact.kind === "recall" ? fact.prompt : `Answer from memory: ${fact.prompt}`,
+      prompt: fact.kind === "recall" ? fact.prompt : `No copying from the notes: ${fact.prompt}`,
       answer: fact.answer,
       source: fact.source,
       hint: `Think about ${fact.subject}.`,
@@ -837,8 +912,24 @@ function normalize(text) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
 }
 
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsIdea(answer, idea) {
+  return new RegExp(`\\b${escapeRegExp(idea)}\\b`).test(answer);
+}
+
 function scoreTyped(userAnswer, answer, source) {
   const normalized = normalize(userAnswer);
+  if (normalized.length < 3) {
+    return {
+      score: 0,
+      hit: [],
+      missed: importantWords(answer).slice(0, 4)
+    };
+  }
+
   const keyIdeas = [...new Set([
     ...importantWords(answer).slice(0, 6),
     ...importantWords(source).slice(0, 4)
@@ -847,18 +938,18 @@ function scoreTyped(userAnswer, answer, source) {
   if (!keyIdeas.length) {
     const close = normalize(answer) && normalized.includes(normalize(answer));
     return {
-      score: close ? 1 : 0.25,
+      score: close ? 1 : 0,
       hit: close ? [answer] : [],
       missed: close ? [] : [answer]
     };
   }
 
-  const hit = keyIdeas.filter((word) => normalized.includes(word));
-  const missed = keyIdeas.filter((word) => !normalized.includes(word));
+  const hit = keyIdeas.filter((word) => containsIdea(normalized, word));
+  const missed = keyIdeas.filter((word) => !containsIdea(normalized, word));
   const coverage = hit.length / keyIdeas.length;
   const directMatch = normalize(answer) && normalized.includes(normalize(answer));
   return {
-    score: directMatch ? 1 : Math.max(0.12, coverage),
+    score: directMatch ? 1 : coverage,
     hit,
     missed
   };
@@ -1037,6 +1128,7 @@ function showResults() {
   const survived = game.playerHealth > 0;
   const baseCoinReward = Math.max(8, Math.round(game.xp / 2)) + (won ? 25 : survived ? 8 : 3);
   const coinReward = Math.round(baseCoinReward * (1 + (Number(player.coinBoost) || 0) * 0.1));
+  player.xp += game.xp;
   player.coins += coinReward;
   if (won) {
     player.bossesDefeated += 1;
@@ -1107,6 +1199,9 @@ rematchButton.addEventListener("click", () => {
 });
 openShopButton.addEventListener("click", () => {
   homeShopPanel.classList.toggle("hidden");
+});
+openAvatarShopButton.addEventListener("click", () => {
+  avatarShopPanel.classList.toggle("hidden");
 });
 adminToggleButton.addEventListener("click", () => {
   if (!requireOwner()) return;

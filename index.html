@@ -87,6 +87,7 @@
           <div class="account-pill">
             <div class="mini-avatar" id="miniAvatar" aria-hidden="true"></div>
             <span id="playerName">Guest</span>
+            <span id="playerLevel">Level 1</span>
             <button class="admin-toggle hidden" id="adminToggleButton" type="button" title="Owner admin panel" aria-label="Owner admin panel">▹_</button>
             <button id="signoutButton" type="button">Sign out</button>
           </div>
@@ -117,13 +118,14 @@
               <label class="file-button" for="fileInput">Upload .txt</label>
               <input id="fileInput" type="file" accept=".txt,.md,.csv" />
               <button class="secondary-button" id="demoButton" type="button">Use demo notes</button>
-              <button class="shop-button" id="openShopButton" type="button">Shop</button>
+              <button class="shop-button" id="openShopButton" type="button">Ability Shop</button>
+              <button class="shop-button" id="openAvatarShopButton" type="button">Avatar Shop</button>
             </div>
 
-            <section class="shop-panel shop-panel-home hidden" id="homeShopPanel" aria-label="Shop">
+            <section class="shop-panel shop-panel-home hidden" id="homeShopPanel" aria-label="Ability shop">
               <div>
-                <p class="eyebrow">Shop</p>
-                <h3>Upgrade your hero</h3>
+                <p class="eyebrow">Ability shop</p>
+                <h3>Upgrade your battle power</h3>
                 <p id="homeShopCopy">Spend coins on battle upgrades.</p>
               </div>
               <div class="shop-items" id="homeShopItems"></div>
@@ -131,6 +133,7 @@
 
             <section class="avatar-panel" aria-label="Avatar customizer">
               <div class="avatar-display" id="avatarDisplay">
+                <div class="avatar-accessory"></div>
                 <div class="avatar-head"></div>
                 <div class="avatar-body"></div>
               </div>
@@ -140,6 +143,15 @@
                 <div class="avatar-options" id="avatarColorOptions" aria-label="Avatar color"></div>
                 <div class="avatar-options" id="avatarClassOptions" aria-label="Avatar class"></div>
               </div>
+            </section>
+
+            <section class="shop-panel shop-panel-home hidden" id="avatarShopPanel" aria-label="Avatar shop">
+              <div>
+                <p class="eyebrow">Avatar shop</p>
+                <h3>Buy colors and accessories</h3>
+                <p id="avatarShopCopy">Unlock cosmetic choices for your hero.</p>
+              </div>
+              <div class="shop-items" id="avatarShopItems"></div>
             </section>
 
             <section class="admin-panel hidden" id="adminPanel" aria-label="Owner admin panel">
@@ -256,6 +268,7 @@
                 <div class="boss-sword"></div>
               </div>
               <div class="hero-sprite" id="heroSprite" aria-hidden="true">
+                <div class="avatar-accessory"></div>
                 <div class="avatar-head">
                   <div class="hero-eye hero-eye-a"></div>
                   <div class="hero-eye hero-eye-b"></div>
@@ -328,7 +341,7 @@
           <div class="weak-list" id="weakList"></div>
           <section class="shop-panel" aria-label="Shop">
             <div>
-              <p class="eyebrow">Shop</p>
+              <p class="eyebrow">Ability shop</p>
               <h3>Buy upgrades</h3>
               <p id="shopCopy">Spend coins to make future battles easier.</p>
             </div>
