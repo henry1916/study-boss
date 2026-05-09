@@ -192,6 +192,47 @@ def answer_is_supported(answer, proof):
     return hits >= max(1, min(2, len(answer_words)))
 
 
+def clamp_score(value):
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(1, score))
+
+
+def groq_json(messages, temperature=0.35, timeout=25):
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is not set.")
+
+    payload = {
+        "model": GROQ_MODEL,
+        "temperature": temperature,
+        "response_format": {"type": "json_object"},
+        "messages": messages,
+    }
+    body = json.dumps(payload).encode()
+    req = request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+            "User-Agent": "StudyBoss/1.0",
+        },
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(req, timeout=timeout) as response:
+            result = json.loads(response.read().decode())
+    except error.HTTPError as exc:
+        details = exc.read().decode(errors="ignore")[:500]
+        raise RuntimeError(f"Groq returned {exc.code}: {details}") from exc
+
+    content = result["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
 def clean_question(item, index):
     question_type = str(item.get("type", "choice")).strip().lower()
     topic = str(item.get("topic", "Study notes")).strip()[:80] or "Study notes"
@@ -260,18 +301,25 @@ Use this shape:
 {{"questions":[{{"type":"choice","topic":"...","prompt":"...","options":["...","...","...","..."],"answer":"...","hint":"...","source":"short quote from notes","explanation":"..."}}]}}
 
 Rules:
-- Make about 75 percent multiple-choice questions and about 25 percent open-response questions.
+- Make about 60 percent multiple-choice questions and about 40 percent open-response questions.
 - Multiple-choice questions must include exactly 4 options and exactly one correct answer.
 - Open-response questions must use type "typed", include answer as a short ideal answer of 2 to 12 words, and include hint/source.
 - If the notes are short, make different question styles from the same note facts instead of inventing new facts.
+- The answer must directly answer the prompt. If the prompt asks "where", use the specific place from the notes, not a bigger category.
 - Make distractors believable but clearly wrong.
 - Write prompts like a helpful study buddy, not a textbook or test-prep robot.
 - Keep wording short and conversational. Good: "What job does chlorophyll do?" Bad: "What is the primary function..."
+- Make answers sound human too. Good: "it absorbs light energy" or "in the chloroplasts". Bad: "A green pigment that absorbs light energy for photosynthesis."
+- Multiple-choice options should be short, natural phrases, not stiff dictionary definitions.
+- Typed ideal answers should sound like something a student would actually type.
+- Use normal kid-friendly phrasing like "why does this matter?", "what is going on here?", or "what would happen if..."
 - Ask about meaning, cause/effect, location, purpose, and relationships, not just copied definitions.
+- Include some questions that ask the player to explain the idea in their own words.
 - Use class-note language from the notes, but do not copy an entire sentence as the question.
 - Avoid repeating the same concept unless the notes are very short.
 - Use only facts found in the notes.
 - source must be a short quote from the notes, and it should contain the answer or the answer's main words.
+- For location questions, choose the most specific location in the source sentence.
 - explanation should briefly explain why the answer is correct in friendly language.
 - Hints should nudge without giving away the answer.
 - No "all of the above" or joke answers.
@@ -284,39 +332,16 @@ Notes:
 {notes[:12000]}
 """.strip()
 
-    payload = {
-        "model": GROQ_MODEL,
-        "temperature": 0.4,
-        "response_format": {"type": "json_object"},
-        "messages": [
+    parsed = groq_json(
+        [
             {
                 "role": "system",
-                "content": "You write reliable quiz cards for a student study game. Return compact valid JSON only.",
+                "content": "You write reliable, human-sounding quiz cards for a student study game. Return compact valid JSON only.",
             },
             {"role": "user", "content": prompt},
         ],
-    }
-    body = json.dumps(payload).encode()
-    req = request.Request(
-        "https://api.groq.com/openai/v1/chat/completions",
-        data=body,
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json",
-            "User-Agent": "StudyBoss/1.0",
-        },
-        method="POST",
+        temperature=0.55,
     )
-
-    try:
-        with request.urlopen(req, timeout=25) as response:
-            result = json.loads(response.read().decode())
-    except error.HTTPError as exc:
-        details = exc.read().decode(errors="ignore")[:500]
-        raise RuntimeError(f"Groq returned {exc.code}: {details}") from exc
-
-    content = result["choices"][0]["message"]["content"]
-    parsed = json.loads(content)
     raw_questions = parsed.get("questions", parsed if isinstance(parsed, list) else [])
     questions = []
     for index, item in enumerate(raw_questions):
@@ -328,6 +353,57 @@ Notes:
     if not questions:
         raise RuntimeError("Groq did not return usable questions.")
     return questions[:count]
+
+
+def grade_typed_answer_with_groq(question, user_answer):
+    prompt = f"""
+Grade this student's open-response answer for a Study Boss battle.
+Return only valid JSON with this shape:
+{{"score":0.0,"summary":"friendly one sentence","matched_ideas":["..."],"missing_ideas":["..."]}}
+
+Scoring rules:
+- 1.0 = fully correct, even if worded differently from the ideal answer.
+- 0.75 = mostly correct but missing one useful detail.
+- 0.5 = partly correct; understands the main topic but misses important pieces.
+- 0.25 = tiny bit related, but not enough for a solid answer.
+- 0.0 = blank, completely off topic, or says the opposite of the notes.
+- Do not give a minimum score. If it is off topic, score 0.
+- Be fair about synonyms and normal student wording.
+- Do not lower the score just because the student used different words from the ideal answer.
+- If the student's answer clearly means the same thing as the ideal answer, score it 1.0.
+- Use the source note as the truth. Do not require facts that are not in the source.
+- If the source clearly supports the student's answer, give full credit even when the ideal answer is less specific or slightly off.
+- For "where" questions, a more specific correct place should beat a broader category from the ideal answer.
+- Keep the summary short, specific, and encouraging.
+
+Question: {question.get("prompt", "")}
+Ideal answer: {question.get("answer", "")}
+Hint: {question.get("hint", "")}
+Source note: {question.get("source", "")}
+Student answer: {user_answer}
+""".strip()
+
+    parsed = groq_json(
+        [
+            {
+                "role": "system",
+                "content": "You are a fair study-game grader. You grade only from the provided source note and return JSON only.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.15,
+    )
+    score = clamp_score(parsed.get("score", 0))
+    summary = str(parsed.get("summary", "")).strip()
+    if not summary:
+        percent = round(score * 100)
+        summary = f"{percent}% spot on."
+    return {
+        "score": score,
+        "summary": summary[:300],
+        "matchedIdeas": parsed.get("matched_ideas", [])[:5] if isinstance(parsed.get("matched_ideas"), list) else [],
+        "missingIdeas": parsed.get("missing_ideas", [])[:5] if isinstance(parsed.get("missing_ideas"), list) else [],
+    }
 
 
 def player_payload(account):
@@ -379,6 +455,9 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/generate-questions":
             self.handle_generate_questions()
+            return
+        if self.path == "/api/grade-answer":
+            self.handle_grade_answer()
             return
         self.send_json(404, {"ok": False, "error": "Unknown endpoint"})
 
@@ -492,12 +571,45 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": "Add more notes first."})
             return
         try:
-            questions = generate_questions_with_groq(notes, count)
+            questions = []
+            used = set()
+            for _ in range(3):
+                if len(questions) >= count:
+                    break
+                batch = generate_questions_with_groq(notes, count + 4)
+                for question in batch:
+                    key = f"{question.get('prompt', '').lower()} {question.get('answer', '').lower()}"
+                    if key in used:
+                        continue
+                    used.add(key)
+                    questions.append(question)
+                    if len(questions) >= count:
+                        break
+            if len(questions) < count:
+                raise RuntimeError("Groq did not return enough unique questions.")
         except Exception as exc:
             print(f"Groq question generation failed: {exc}", flush=True)
             self.send_json(503, {"ok": False, "error": "AI question generation failed."})
             return
         self.send_json(200, {"ok": True, "questions": questions, "model": GROQ_MODEL})
+
+    def handle_grade_answer(self):
+        data = self.read_json()
+        question = data.get("question", {})
+        user_answer = " ".join(str(data.get("answer", "")).strip().split())
+        if not isinstance(question, dict):
+            self.send_json(400, {"ok": False, "error": "Missing question."})
+            return
+        if len(user_answer) < 1:
+            self.send_json(400, {"ok": False, "error": "Type an answer first."})
+            return
+        try:
+            grade = grade_typed_answer_with_groq(question, user_answer)
+        except Exception as exc:
+            print(f"Groq answer grading failed: {exc}", flush=True)
+            self.send_json(503, {"ok": False, "error": "AI grading failed."})
+            return
+        self.send_json(200, {"ok": True, "grade": grade, "model": GROQ_MODEL})
 
 
 if __name__ == "__main__":

@@ -846,20 +846,6 @@ async function buildQuestionsWithAi(notes, count) {
   return result.questions;
 }
 
-function fillQuestionGaps(questions, notes, count) {
-  if (questions.length >= count) return questions.slice(0, count);
-  const used = new Set(questions.map((question) => normalize(`${question.prompt} ${question.answer}`)));
-  const fallbackQuestions = buildQuestions(notes, count);
-  fallbackQuestions.forEach((question) => {
-    if (questions.length >= count) return;
-    const key = normalize(`${question.prompt} ${question.answer}`);
-    if (used.has(key)) return;
-    used.add(key);
-    questions.push(question);
-  });
-  return questions.slice(0, count);
-}
-
 function prepareBattle() {
   const notes = cleanText(notesInput.value);
   if (notes.length < 80) {
@@ -882,11 +868,14 @@ async function startBattle() {
   let questions;
   try {
     questions = await buildQuestionsWithAi(notes, questionCount);
-    questions = fillQuestionGaps(questions, notes, questionCount);
+    if (questions.length < questionCount) {
+      throw new Error("AI did not return enough questions.");
+    }
     battleBanner.textContent = "A wild study boss appears. Choose your attack.";
-  } catch {
-    questions = buildQuestions(notes, questionCount);
-    battleBanner.textContent = "A wild study boss appears. Choose your attack.";
+  } catch (error) {
+    errorMessage.textContent = "AI question generation could not finish. Check your API key or try again.";
+    console.error(error);
+    return;
   } finally {
     startBattleButton.disabled = false;
     startBattleButton.textContent = "Start Battle";
@@ -1012,7 +1001,33 @@ function scoreTyped(userAnswer, answer, source) {
   };
 }
 
-function gradeAnswer(question, userAnswer) {
+async function gradeTypedAnswerWithAi(question, userAnswer) {
+  const response = await fetch("/api/grade-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, answer: userAnswer })
+  });
+  if (!response.ok) {
+    throw new Error("AI grading failed.");
+  }
+  const result = await response.json();
+  if (!result.ok || !result.grade) {
+    throw new Error("AI returned an invalid grade.");
+  }
+  const grade = result.grade;
+  const matched = Array.isArray(grade.matchedIdeas) && grade.matchedIdeas.length
+    ? ` You nailed: ${grade.matchedIdeas.slice(0, 3).join(", ")}.`
+    : "";
+  const missing = Array.isArray(grade.missingIdeas) && grade.missingIdeas.length
+    ? ` Review: ${grade.missingIdeas.slice(0, 3).join(", ")}.`
+    : "";
+  return {
+    score: Math.min(1, Math.max(0, Number(grade.score) || 0)),
+    summary: `${grade.summary || "AI graded your answer."}${matched}${missing}`
+  };
+}
+
+async function gradeAnswer(question, userAnswer) {
   if (question.type === "choice") {
     const correct = normalize(userAnswer) === normalize(question.answer);
     return {
@@ -1023,14 +1038,7 @@ function gradeAnswer(question, userAnswer) {
     };
   }
 
-  const grade = scoreTyped(userAnswer, question.answer, question.source);
-  const percent = Math.round(grade.score * 100);
-  const hitText = grade.hit.length ? `You covered: ${grade.hit.slice(0, 4).join(", ")}.` : "You did not hit the main key ideas yet.";
-  const missedText = grade.missed.length ? ` Review: ${grade.missed.slice(0, 4).join(", ")}.` : " Nothing major missing.";
-  return {
-    score: grade.score,
-    summary: `${percent}% spot on. ${hitText}${missedText}`
-  };
+  return gradeTypedAnswerWithAi(question, userAnswer);
 }
 
 function damageForScore(score) {
@@ -1047,7 +1055,7 @@ function bossDamageForScore(score) {
   return Math.max(0, damage - (Number(player.shieldBoost) || 0));
 }
 
-function submitAttack() {
+async function submitAttack() {
   const question = game.questions[game.current];
   if (game.locked) return;
 
@@ -1057,8 +1065,18 @@ function submitAttack() {
     return;
   }
 
-  const grade = gradeAnswer(question, userAnswer);
-  applyAttack(grade);
+  submitButton.disabled = true;
+  submitButton.textContent = question.type === "typed" ? "AI grading..." : "Attack";
+  try {
+    const grade = await gradeAnswer(question, userAnswer);
+    applyAttack(grade);
+  } catch (error) {
+    feedbackText.textContent = "AI grading could not finish. Try attacking again in a second.";
+    console.error(error);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Attack";
+  }
 }
 
 function applyAttack(grade) {
