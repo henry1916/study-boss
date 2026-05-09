@@ -623,6 +623,144 @@ textarea:focus,
   animation: heroHurt 0.45s ease;
 }
 
+.party-lineup {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 184px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.party-member {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 76px;
+}
+
+.party-member.current .party-name {
+  color: var(--green);
+  border-color: rgba(82, 209, 168, 0.62);
+}
+
+.party-member.down {
+  opacity: 0.48;
+  filter: grayscale(0.45);
+}
+
+.party-name,
+.party-hp {
+  max-width: 76px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 240, 232, 0.2);
+  border-radius: 999px;
+  background: rgba(16, 17, 20, 0.78);
+  padding: 3px 7px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party-hp {
+  color: var(--gold);
+  font-size: 0.66rem;
+}
+
+.party-avatar {
+  position: relative;
+  width: 64px;
+  height: 78px;
+  filter: drop-shadow(0 12px 12px rgba(0, 0, 0, 0.24));
+}
+
+.party-avatar .avatar-head {
+  width: 38px;
+  height: 38px;
+  border-width: 2px;
+}
+
+.party-avatar .avatar-head::before,
+.party-avatar .avatar-head::after {
+  display: none;
+}
+
+.party-avatar .avatar-body {
+  width: 52px;
+  height: 45px;
+  border-width: 2px;
+  border-radius: 13px 13px 7px 7px;
+}
+
+.party-avatar .avatar-accessory {
+  width: 42px;
+  height: 20px;
+}
+
+.party-avatar .hero-eye {
+  position: absolute;
+  top: 14px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.party-avatar .hero-eye-a {
+  left: 10px;
+}
+
+.party-avatar .hero-eye-b {
+  right: 10px;
+}
+
+.party-avatar .hero-mouth {
+  position: absolute;
+  left: 50%;
+  top: 21px;
+  width: 17px;
+  height: 9px;
+  border-bottom: 3px solid var(--ink);
+  border-radius: 0 0 999px 999px;
+  transform: translateX(-50%);
+}
+
+.party-avatar .hero-sword {
+  position: absolute;
+  right: -4px;
+  bottom: 32px;
+  width: 9px;
+  height: 46px;
+  border-radius: 999px;
+  background: linear-gradient(#ffffff, #bfe7ff);
+  transform: rotate(42deg);
+  box-shadow: 0 0 12px rgba(191, 231, 255, 0.4);
+}
+
+.party-avatar .hero-sword::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  bottom: -5px;
+  width: 23px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.party-avatar.dark-avatar .hero-eye,
+.party-avatar.dark-avatar .hero-mouth {
+  border-color: var(--text);
+  background: var(--text);
+}
+
 .boss-sprite {
   position: absolute;
   right: 10%;
@@ -1149,13 +1287,15 @@ textarea:focus,
 }
 
 .avatar-display.crown .avatar-accessory,
-.hero-sprite.crown .avatar-accessory {
+.hero-sprite.crown .avatar-accessory,
+.party-avatar.crown .avatar-accessory {
   background: var(--gold);
   clip-path: polygon(0 100%, 12% 35%, 34% 82%, 50% 0, 66% 82%, 88% 35%, 100% 100%);
 }
 
 .avatar-display.headband .avatar-accessory,
-.hero-sprite.headband .avatar-accessory {
+.hero-sprite.headband .avatar-accessory,
+.party-avatar.headband .avatar-accessory {
   height: 10px;
   border-radius: 999px;
   background: #ff5f6d;
@@ -1169,8 +1309,13 @@ textarea:focus,
   top: 10px;
 }
 
+.party-avatar.headband .avatar-accessory {
+  top: 8px;
+}
+
 .avatar-display.star .avatar-accessory,
-.hero-sprite.star .avatar-accessory {
+.hero-sprite.star .avatar-accessory,
+.party-avatar.star .avatar-accessory {
   top: -22px;
   width: 34px;
   height: 34px;
@@ -1179,7 +1324,8 @@ textarea:focus,
 }
 
 .avatar-display.wizardHat .avatar-accessory,
-.hero-sprite.wizardHat .avatar-accessory {
+.hero-sprite.wizardHat .avatar-accessory,
+.party-avatar.wizardHat .avatar-accessory {
   width: 58px;
   height: 58px;
   background: linear-gradient(135deg, #7657ff, #2d8cff);
@@ -1194,8 +1340,13 @@ textarea:focus,
   top: -58px;
 }
 
+.party-avatar.wizardHat .avatar-accessory {
+  top: -32px;
+}
+
 .avatar-display.halo .avatar-accessory,
-.hero-sprite.halo .avatar-accessory {
+.hero-sprite.halo .avatar-accessory,
+.party-avatar.halo .avatar-accessory {
   top: -14px;
   width: 58px;
   height: 18px;
@@ -1206,7 +1357,8 @@ textarea:focus,
 }
 
 .avatar-display.visor .avatar-accessory,
-.hero-sprite.visor .avatar-accessory {
+.hero-sprite.visor .avatar-accessory,
+.party-avatar.visor .avatar-accessory {
   top: 20px;
   width: 54px;
   height: 17px;
@@ -1216,7 +1368,8 @@ textarea:focus,
 }
 
 .avatar-display.laurel .avatar-accessory,
-.hero-sprite.laurel .avatar-accessory {
+.hero-sprite.laurel .avatar-accessory,
+.party-avatar.laurel .avatar-accessory {
   top: -3px;
   width: 64px;
   height: 34px;
@@ -1226,7 +1379,8 @@ textarea:focus,
 }
 
 .avatar-display.spark .avatar-accessory,
-.hero-sprite.spark .avatar-accessory {
+.hero-sprite.spark .avatar-accessory,
+.party-avatar.spark .avatar-accessory {
   top: -30px;
   width: 38px;
   height: 38px;

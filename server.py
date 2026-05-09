@@ -463,6 +463,21 @@ def clean_room_name(name, fallback="Player"):
     return name[:24] or fallback
 
 
+def clean_room_avatar(avatar):
+    if not isinstance(avatar, dict):
+        return default_avatar()
+    color = str(avatar.get("color", default_avatar()["color"]))
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        color = default_avatar()["color"]
+    hero_class = str(avatar.get("heroClass", default_avatar()["heroClass"]))
+    if hero_class not in {"knight", "mage", "rogue", "tank"}:
+        hero_class = default_avatar()["heroClass"]
+    accessory = str(avatar.get("accessory", default_avatar()["accessory"]))
+    if accessory not in {"none", "crown", "headband", "star", "wizardHat", "halo", "visor", "laurel", "spark"}:
+        accessory = default_avatar()["accessory"]
+    return {"color": color, "heroClass": hero_class, "accessory": accessory}
+
+
 def multiplayer_damage_for_score(score):
     if score <= 0:
         return 0
@@ -498,6 +513,7 @@ def room_public(room, player_id):
             "hp": room_player["hp"],
             "maxHp": room_player["maxHp"],
             "isHost": pid == room["hostId"],
+            "avatar": room_player.get("avatar", default_avatar()),
         })
     current_question = None
     if room["questions"] and room["current"] < len(room["questions"]):
@@ -734,6 +750,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         data = self.read_json()
         notes = " ".join(str(data.get("notes", "")).strip().split())
         host_name = clean_room_name(data.get("name"), "Host")
+        host_avatar = clean_room_avatar(data.get("avatar", {}))
         count = min(40, max(1, int(data.get("count", 15) or 15)))
         player_hp = min(999, max(1, int(data.get("playerHp", 100) or 100)))
         boss_hp = min(20000, max(1, int(data.get("bossHp", 500) or 500)))
@@ -769,6 +786,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                         "name": host_name,
                         "hp": player_hp,
                         "maxHp": player_hp,
+                        "avatar": host_avatar,
                     }
                 },
                 "chat": [],
@@ -783,6 +801,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         data = self.read_json()
         code = str(data.get("code", "")).strip().upper()
         name = clean_room_name(data.get("name"), "Player")
+        avatar = clean_room_avatar(data.get("avatar", {}))
         with ROOM_LOCK:
             room = ROOMS.get(code)
             if not room:
@@ -790,7 +809,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                 return
             player_id = make_player_id()
             max_hp = next(iter(room["players"].values()))["maxHp"] if room["players"] else 100
-            room["players"][player_id] = {"name": name, "hp": max_hp, "maxHp": max_hp}
+            room["players"][player_id] = {"name": name, "hp": max_hp, "maxHp": max_hp, "avatar": avatar}
             add_room_chat(room, "Study Boss", f"{name} joined the raid.", True)
             payload = room_public(room, player_id)
         self.send_json(200, {"ok": True, "room": payload})

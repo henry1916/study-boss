@@ -88,6 +88,7 @@ const damagePop = document.querySelector("#damagePop");
 const attackPop = document.querySelector("#attackPop");
 const bossSprite = document.querySelector("#bossSprite");
 const heroSprite = document.querySelector("#heroSprite");
+const partyLineup = document.querySelector("#partyLineup");
 const devBattleControls = document.querySelector("#devBattleControls");
 const devCorrectButton = document.querySelector("#devCorrectButton");
 const devWrongButton = document.querySelector("#devWrongButton");
@@ -232,6 +233,7 @@ function showStartScreen() {
   startScreen.classList.remove("hidden");
   battleScreen.classList.add("hidden");
   multiplayerRoomPanel.classList.add("hidden");
+  partyLineup.classList.add("hidden");
   updatePlayerHud();
 }
 
@@ -242,6 +244,7 @@ function showAuthScreen(message = "") {
   startScreen.classList.add("hidden");
   battleScreen.classList.add("hidden");
   multiplayerRoomPanel.classList.add("hidden");
+  partyLineup.classList.add("hidden");
 }
 
 function setAuthMode(mode) {
@@ -536,14 +539,8 @@ function isOwner() {
 
 function renderAvatar() {
   const avatar = { ...defaultAvatar, ...(player.avatar || {}) };
-  const darkAvatar = normalize(avatar.color) === "111111";
   [miniAvatar, avatarDisplay, heroSprite].forEach((element) => {
-    element.style.setProperty("--avatar-color", avatar.color);
-    element.classList.toggle("dark-avatar", darkAvatar);
-    element.classList.remove(...avatarClasses);
-    element.classList.remove(...avatarAccessories);
-    element.classList.add(avatar.heroClass);
-    element.classList.add(avatar.accessory);
+    applyAvatarClasses(element, avatar);
   });
 
   avatarColorOptions.querySelectorAll("button").forEach((button) => {
@@ -904,6 +901,21 @@ function playerDisplayName() {
   return player.username && player.username !== "Guest" ? player.username : "Guest";
 }
 
+function currentAvatar() {
+  return { ...defaultAvatar, ...(player.avatar || {}) };
+}
+
+function applyAvatarClasses(element, avatar) {
+  const cleanAvatar = { ...defaultAvatar, ...(avatar || {}) };
+  const darkAvatar = normalize(cleanAvatar.color) === "111111";
+  element.style.setProperty("--avatar-color", cleanAvatar.color);
+  element.classList.toggle("dark-avatar", darkAvatar);
+  element.classList.remove(...avatarClasses);
+  element.classList.remove(...avatarAccessories);
+  element.classList.add(cleanAvatar.heroClass);
+  element.classList.add(cleanAvatar.accessory);
+}
+
 function stopMultiplayerPolling() {
   if (multiplayerState.pollTimer) {
     window.clearInterval(multiplayerState.pollTimer);
@@ -930,6 +942,7 @@ async function hostMultiplayerRoom() {
   try {
     const result = await postJson("/api/multiplayer/host", {
       name: playerDisplayName(),
+      avatar: currentAvatar(),
       notes,
       count: readNumber(multiQuestionCountInput, 15, 1, 40),
       playerHp: readNumber(multiPlayerHpInput, 100, 1, 999),
@@ -956,6 +969,7 @@ async function joinMultiplayerRoom() {
     const result = await postJson("/api/multiplayer/join", {
       code,
       name: playerDisplayName(),
+      avatar: currentAvatar(),
     });
     enterMultiplayerRoom(result.room);
   } catch (error) {
@@ -979,6 +993,8 @@ function enterMultiplayerRoom(room) {
   resultsPanel.classList.add("hidden");
   document.querySelector(".battle-grid").classList.remove("hidden");
   multiplayerRoomPanel.classList.remove("hidden");
+  partyLineup.classList.remove("hidden");
+  heroSprite.classList.add("hidden");
   updateMultiplayerRoom(room);
   multiplayerState.pollTimer = window.setInterval(pollMultiplayerRoom, 1800);
 }
@@ -1014,6 +1030,7 @@ function updateMultiplayerRoom(room) {
   xpValue.textContent = "Co-op";
   coinValue.textContent = room.players.length;
   renderMultiplayerPlayers(room.players);
+  renderPartyLineup(room.players, room.playerId);
   renderMultiplayerChat(room.chat);
   if (room.status !== "battle") {
     questionText.textContent = room.status === "won" ? "Raid boss defeated." : room.status === "lost" ? "Your team was knocked back." : "The boss escaped.";
@@ -1037,6 +1054,45 @@ function updateMultiplayerRoom(room) {
   roundText.textContent = `Raid question ${room.current + 1} of ${room.questionCount}`;
   battleBanner.textContent = room.lastFeedback || "Work together. Any teammate can attack.";
   nextButton.classList.add("hidden");
+}
+
+function renderPartyLineup(players, currentPlayerId) {
+  partyLineup.innerHTML = "";
+  partyLineup.classList.toggle("hidden", !multiplayerState.active);
+  players.slice(0, 6).forEach((roomPlayer) => {
+    const card = document.createElement("div");
+    card.className = "party-member";
+    if (roomPlayer.id === currentPlayerId) {
+      card.classList.add("current");
+    }
+    if (roomPlayer.hp <= 0) {
+      card.classList.add("down");
+    }
+
+    const name = document.createElement("span");
+    name.className = "party-name";
+    name.textContent = roomPlayer.name;
+
+    const avatar = document.createElement("div");
+    avatar.className = "party-avatar";
+    avatar.innerHTML = `
+      <div class="avatar-accessory"></div>
+      <div class="avatar-head">
+        <div class="hero-eye hero-eye-a"></div>
+        <div class="hero-eye hero-eye-b"></div>
+        <div class="hero-mouth"></div>
+      </div>
+      <div class="avatar-body"></div>
+      <div class="hero-sword"></div>
+    `;
+    applyAvatarClasses(avatar, roomPlayer.avatar);
+
+    const hp = document.createElement("strong");
+    hp.className = "party-hp";
+    hp.textContent = `${roomPlayer.hp}/${roomPlayer.maxHp}`;
+    card.append(name, avatar, hp);
+    partyLineup.append(card);
+  });
 }
 
 function renderMultiplayerPlayers(players) {
@@ -1126,6 +1182,8 @@ function prepareBattle() {
 async function startBattle() {
   stopMultiplayerPolling();
   multiplayerRoomPanel.classList.add("hidden");
+  partyLineup.classList.add("hidden");
+  heroSprite.classList.remove("hidden");
   const notes = pendingNotes || cleanText(notesInput.value);
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
   const playerHp = readNumber(playerHpInput, 100, 1, 999);
@@ -1517,6 +1575,8 @@ function showResults() {
 function returnToNotes() {
   stopMultiplayerPolling();
   multiplayerRoomPanel.classList.add("hidden");
+  partyLineup.classList.add("hidden");
+  heroSprite.classList.remove("hidden");
   battleScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
   document.querySelector(".battle-grid").classList.remove("hidden");
