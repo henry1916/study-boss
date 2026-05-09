@@ -192,6 +192,17 @@ def answer_is_supported(answer, proof):
     return hits >= max(1, min(2, len(answer_words)))
 
 
+def polish_text(text):
+    text = " ".join(str(text).strip().split())
+    if not text:
+        return ""
+    first_alpha = re.search(r"[A-Za-z]", text)
+    if not first_alpha:
+        return text
+    index = first_alpha.start()
+    return f"{text[:index]}{text[index].upper()}{text[index + 1:]}"
+
+
 def clamp_score(value):
     try:
         score = float(value)
@@ -251,9 +262,14 @@ def clean_question(item, index):
         return None
     if source and not answer_is_supported(answer, f"{source} {hint}"):
         return None
+    prompt = polish_text(prompt)
+    answer = polish_text(answer)
+    source = polish_text(source)
+    hint = polish_text(hint)
+    topic = polish_text(topic)
 
     if question_type in {"multiple_choice", "choice"}:
-        options = [str(option).strip() for option in options if str(option).strip()]
+        options = [polish_text(option) for option in options if str(option).strip()]
         seen = set()
         unique_options = [answer]
         seen.add(answer.lower())
@@ -312,6 +328,7 @@ Rules:
 - Make answers sound human too. Good: "it absorbs light energy" or "in the chloroplasts". Bad: "A green pigment that absorbs light energy for photosynthesis."
 - Multiple-choice options should be short, natural phrases, not stiff dictionary definitions.
 - Typed ideal answers should sound like something a student would actually type.
+- Use correct capitalization for prompts, answers, hints, topics, and answer choices. Keep acronyms like ATP and NADPH uppercase.
 - Use normal kid-friendly phrasing like "why does this matter?", "what is going on here?", or "what would happen if..."
 - Ask about meaning, cause/effect, location, purpose, and relationships, not just copied definitions.
 - Include some questions that ask the player to explain the idea in their own words.
