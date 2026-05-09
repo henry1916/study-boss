@@ -868,9 +868,6 @@ async function startBattle() {
   let questions;
   try {
     questions = await buildQuestionsWithAi(notes, questionCount);
-    if (questions.length < questionCount) {
-      throw new Error("AI did not return enough questions.");
-    }
     battleBanner.textContent = "A wild study boss appears. Choose your attack.";
   } catch (error) {
     errorMessage.textContent = "AI question generation could not finish. Check your API key or try again.";

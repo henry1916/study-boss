@@ -590,20 +590,14 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         try:
             questions = []
             used = set()
-            for _ in range(3):
-                if len(questions) >= count:
-                    break
-                batch = generate_questions_with_groq(notes, count + 4)
-                for question in batch:
-                    key = f"{question.get('prompt', '').lower()} {question.get('answer', '').lower()}"
-                    if key in used:
-                        continue
-                    used.add(key)
-                    questions.append(question)
-                    if len(questions) >= count:
-                        break
-            if len(questions) < count:
-                raise RuntimeError("Groq did not return enough unique questions.")
+            for question in generate_questions_with_groq(notes, count):
+                key = f"{question.get('prompt', '').lower()} {question.get('answer', '').lower()}"
+                if key in used:
+                    continue
+                used.add(key)
+                questions.append(question)
+            if not questions:
+                raise RuntimeError("Groq did not return usable questions.")
         except Exception as exc:
             print(f"Groq question generation failed: {exc}", flush=True)
             self.send_json(503, {"ok": False, "error": "AI question generation failed."})
