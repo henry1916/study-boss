@@ -835,6 +835,7 @@ function shuffle(items) {
 function readNumber(input, fallback, min, max) {
   const value = Number.parseInt(input.value, 10);
   if (Number.isNaN(value)) return fallback;
+  if (max === Infinity) return Math.max(min, value);
   return Math.min(max, Math.max(min, value));
 }
 
@@ -945,7 +946,7 @@ async function hostMultiplayerRoom() {
       avatar: currentAvatar(),
       notes,
       count: readNumber(multiQuestionCountInput, 15, 1, 40),
-      playerHp: readNumber(multiPlayerHpInput, 100, 1, 999),
+      playerHp: readNumber(multiPlayerHpInput, 100, 1, Infinity),
       bossHp: readNumber(multiBossHpInput, 600, 1, 20000),
     });
     enterMultiplayerRoom(result.room);
@@ -1186,7 +1187,7 @@ async function startBattle() {
   heroSprite.classList.remove("hidden");
   const notes = pendingNotes || cleanText(notesInput.value);
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
-  const playerHp = readNumber(playerHpInput, 100, 1, 999);
+  const playerHp = readNumber(playerHpInput, 100, 1, Infinity);
   const bossHp = readNumber(bossHpInput, 200, 1, 9999);
   startBattleButton.disabled = true;
   startBattleButton.textContent = "Building questions...";

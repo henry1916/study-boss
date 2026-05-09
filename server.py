@@ -752,7 +752,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         host_name = clean_room_name(data.get("name"), "Host")
         host_avatar = clean_room_avatar(data.get("avatar", {}))
         count = min(40, max(1, int(data.get("count", 15) or 15)))
-        player_hp = min(999, max(1, int(data.get("playerHp", 100) or 100)))
+        player_hp = max(1, int(data.get("playerHp", 100) or 100))
         boss_hp = min(20000, max(1, int(data.get("bossHp", 500) or 500)))
         if len(notes) < 80:
             self.send_json(400, {"ok": False, "error": "Add more notes first."})
