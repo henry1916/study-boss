@@ -1134,25 +1134,38 @@ function forceDevAnswer(score) {
   });
 }
 
+function clearBossActionClasses() {
+  bossSprite.classList.remove("hit");
+  bossSprite.classList.remove("attack");
+  bossSprite.classList.remove("hurt");
+}
+
+function clearHeroActionClasses() {
+  heroSprite.classList.remove("attack");
+  heroSprite.classList.remove("hurt");
+}
+
 function showDamage(text) {
   damagePop.textContent = text;
   damagePop.classList.remove("show");
-  bossSprite.classList.remove("hit");
-  bossSprite.classList.remove("hurt");
+  clearBossActionClasses();
   bossSprite.classList.remove("hurt-face");
   requestAnimationFrame(() => {
     damagePop.classList.add("show");
     bossSprite.classList.add("hit");
   });
+  window.setTimeout(() => {
+    bossSprite.classList.remove("hit");
+  }, 360);
 }
 
 function showHeroAttack(text) {
   damagePop.textContent = text;
   damagePop.classList.remove("show");
-  heroSprite.classList.remove("attack");
+  clearHeroActionClasses();
   heroSprite.classList.remove("angry");
   heroSprite.classList.remove("hurt-face");
-  bossSprite.classList.remove("hurt");
+  clearBossActionClasses();
   bossSprite.classList.remove("hurt-face");
   requestAnimationFrame(() => {
     heroSprite.classList.add("attack");
@@ -1162,7 +1175,9 @@ function showHeroAttack(text) {
     damagePop.classList.add("show");
   });
   window.setTimeout(() => {
+    heroSprite.classList.remove("attack");
     heroSprite.classList.remove("angry");
+    bossSprite.classList.remove("hurt");
     bossSprite.classList.remove("hurt-face");
   }, 720);
 }
@@ -1170,9 +1185,9 @@ function showHeroAttack(text) {
 function showBossAttack(text) {
   attackPop.textContent = text;
   attackPop.classList.remove("show");
-  bossSprite.classList.remove("attack");
+  clearBossActionClasses();
   bossSprite.classList.remove("angry");
-  heroSprite.classList.remove("hurt");
+  clearHeroActionClasses();
   heroSprite.classList.remove("hurt-face");
   requestAnimationFrame(() => {
     attackPop.classList.add("show");
@@ -1182,7 +1197,9 @@ function showBossAttack(text) {
     heroSprite.classList.add("hurt-face");
   });
   window.setTimeout(() => {
+    bossSprite.classList.remove("attack");
     bossSprite.classList.remove("angry");
+    heroSprite.classList.remove("hurt");
     heroSprite.classList.remove("hurt-face");
   }, 720);
 }
