@@ -24,6 +24,19 @@ const fileInput = document.querySelector("#fileInput");
 const demoButton = document.querySelector("#demoButton");
 const openShopButton = document.querySelector("#openShopButton");
 const openAvatarShopButton = document.querySelector("#openAvatarShopButton");
+const multiplayerButton = document.querySelector("#multiplayerButton");
+const multiplayerPanel = document.querySelector("#multiplayerPanel");
+const showHostButton = document.querySelector("#showHostButton");
+const showJoinButton = document.querySelector("#showJoinButton");
+const hostPanel = document.querySelector("#hostPanel");
+const joinPanel = document.querySelector("#joinPanel");
+const multiQuestionCountInput = document.querySelector("#multiQuestionCountInput");
+const multiPlayerHpInput = document.querySelector("#multiPlayerHpInput");
+const multiBossHpInput = document.querySelector("#multiBossHpInput");
+const hostRoomButton = document.querySelector("#hostRoomButton");
+const roomCodeInput = document.querySelector("#roomCodeInput");
+const joinRoomButton = document.querySelector("#joinRoomButton");
+const multiplayerMessage = document.querySelector("#multiplayerMessage");
 const homeShopPanel = document.querySelector("#homeShopPanel");
 const homeShopCopy = document.querySelector("#homeShopCopy");
 const homeShopItems = document.querySelector("#homeShopItems");
@@ -65,6 +78,12 @@ const submitButton = document.querySelector("#submitButton");
 const nextButton = document.querySelector("#nextButton");
 const hintButton = document.querySelector("#hintButton");
 const feedbackText = document.querySelector("#feedbackText");
+const multiplayerRoomPanel = document.querySelector("#multiplayerRoomPanel");
+const roomCodeText = document.querySelector("#roomCodeText");
+const roomPlayers = document.querySelector("#roomPlayers");
+const chatLog = document.querySelector("#chatLog");
+const chatInput = document.querySelector("#chatInput");
+const sendChatButton = document.querySelector("#sendChatButton");
 const damagePop = document.querySelector("#damagePop");
 const attackPop = document.querySelector("#attackPop");
 const bossSprite = document.querySelector("#bossSprite");
@@ -116,6 +135,15 @@ let activeProfile = localStorage.getItem("studyBossActiveProfile") || "";
 let player = loadPlayer(activeProfile);
 let serverBackedProfile = Boolean(activeProfile && activeProfile !== "guest" && !allowLocalAccountFallback);
 let pendingNotes = "";
+let multiplayerState = {
+  active: false,
+  isHost: false,
+  code: "",
+  playerId: "",
+  pollTimer: null,
+  current: -1,
+  status: "",
+};
 
 const stopwords = new Set([
   "the", "and", "that", "this", "with", "from", "into", "where", "when", "what",
@@ -198,18 +226,22 @@ async function hashPassword(password, username) {
 }
 
 function showStartScreen() {
+  stopMultiplayerPolling();
   playerName.textContent = player.username;
   authScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
   battleScreen.classList.add("hidden");
+  multiplayerRoomPanel.classList.add("hidden");
   updatePlayerHud();
 }
 
 function showAuthScreen(message = "") {
+  stopMultiplayerPolling();
   authMessage.textContent = message;
   authScreen.classList.remove("hidden");
   startScreen.classList.add("hidden");
   battleScreen.classList.add("hidden");
+  multiplayerRoomPanel.classList.add("hidden");
 }
 
 function setAuthMode(mode) {
@@ -846,6 +878,239 @@ async function buildQuestionsWithAi(notes, count) {
   return result.questions;
 }
 
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || "Request failed.");
+  }
+  return result;
+}
+
+function setMultiplayerMode(mode) {
+  const hosting = mode === "host";
+  hostPanel.classList.toggle("hidden", !hosting);
+  joinPanel.classList.toggle("hidden", hosting);
+  showHostButton.classList.toggle("active", hosting);
+  showJoinButton.classList.toggle("active", !hosting);
+  multiplayerMessage.textContent = "";
+}
+
+function playerDisplayName() {
+  return player.username && player.username !== "Guest" ? player.username : "Guest";
+}
+
+function stopMultiplayerPolling() {
+  if (multiplayerState.pollTimer) {
+    window.clearInterval(multiplayerState.pollTimer);
+  }
+  multiplayerState = {
+    active: false,
+    isHost: false,
+    code: "",
+    playerId: "",
+    pollTimer: null,
+    current: -1,
+    status: "",
+  };
+}
+
+async function hostMultiplayerRoom() {
+  const notes = cleanText(notesInput.value);
+  if (notes.length < 80) {
+    multiplayerMessage.textContent = "Add notes first so the raid boss can be generated.";
+    return;
+  }
+  hostRoomButton.disabled = true;
+  hostRoomButton.textContent = "Creating room...";
+  try {
+    const result = await postJson("/api/multiplayer/host", {
+      name: playerDisplayName(),
+      notes,
+      count: readNumber(multiQuestionCountInput, 15, 1, 40),
+      playerHp: readNumber(multiPlayerHpInput, 100, 1, 999),
+      bossHp: readNumber(multiBossHpInput, 600, 1, 20000),
+    });
+    enterMultiplayerRoom(result.room);
+  } catch (error) {
+    multiplayerMessage.textContent = error.message || "Could not host a room.";
+  } finally {
+    hostRoomButton.disabled = false;
+    hostRoomButton.textContent = "Host Room";
+  }
+}
+
+async function joinMultiplayerRoom() {
+  const code = cleanText(roomCodeInput.value).toUpperCase();
+  if (code.length < 4) {
+    multiplayerMessage.textContent = "Enter the room code.";
+    return;
+  }
+  joinRoomButton.disabled = true;
+  joinRoomButton.textContent = "Joining...";
+  try {
+    const result = await postJson("/api/multiplayer/join", {
+      code,
+      name: playerDisplayName(),
+    });
+    enterMultiplayerRoom(result.room);
+  } catch (error) {
+    multiplayerMessage.textContent = error.message || "Could not join that room.";
+  } finally {
+    joinRoomButton.disabled = false;
+    joinRoomButton.textContent = "Join Room";
+  }
+}
+
+function enterMultiplayerRoom(room) {
+  stopMultiplayerPolling();
+  multiplayerState.active = true;
+  multiplayerState.isHost = room.isHost;
+  multiplayerState.code = room.code;
+  multiplayerState.playerId = room.playerId;
+  multiplayerState.current = -1;
+  multiplayerState.status = room.status;
+  startScreen.classList.add("hidden");
+  battleScreen.classList.remove("hidden");
+  resultsPanel.classList.add("hidden");
+  document.querySelector(".battle-grid").classList.remove("hidden");
+  multiplayerRoomPanel.classList.remove("hidden");
+  updateMultiplayerRoom(room);
+  multiplayerState.pollTimer = window.setInterval(pollMultiplayerRoom, 1800);
+}
+
+async function pollMultiplayerRoom() {
+  if (!multiplayerState.active) return;
+  try {
+    const result = await postJson("/api/multiplayer/state", {
+      code: multiplayerState.code,
+      playerId: multiplayerState.playerId,
+    });
+    updateMultiplayerRoom(result.room);
+  } catch (error) {
+    battleBanner.textContent = error.message || "Lost connection to the room.";
+    stopMultiplayerPolling();
+  }
+}
+
+function updateMultiplayerRoom(room) {
+  multiplayerState.isHost = room.isHost;
+  multiplayerState.status = room.status;
+  roomCodeText.textContent = room.code;
+  game.boss = room.boss;
+  game.questions = room.question ? [room.question] : [];
+  game.current = 0;
+  game.maxHealth = room.maxHealth;
+  game.health = room.health;
+  const me = room.players.find((item) => item.id === room.playerId) || room.players[0] || { hp: 0, maxHp: 1 };
+  game.maxPlayerHealth = me.maxHp;
+  game.playerHealth = me.hp;
+  bossName.textContent = room.boss;
+  bossTitle.textContent = room.boss;
+  xpValue.textContent = "Co-op";
+  coinValue.textContent = room.players.length;
+  renderMultiplayerPlayers(room.players);
+  renderMultiplayerChat(room.chat);
+  if (room.status !== "battle") {
+    questionText.textContent = room.status === "won" ? "Raid boss defeated." : room.status === "lost" ? "Your team was knocked back." : "The boss escaped.";
+    answerOptions.innerHTML = "";
+    typedAnswer.classList.add("hidden");
+    submitButton.classList.add("hidden");
+    nextButton.classList.add("hidden");
+    hintButton.disabled = true;
+    battleBanner.textContent = room.status === "won" ? "Victory. Your team won the raid." : "The co-op battle is over.";
+    feedbackText.textContent = room.lastFeedback || "";
+    updateHealth();
+    return;
+  }
+  const changedQuestion = multiplayerState.current !== room.current;
+  multiplayerState.current = room.current;
+  if (changedQuestion) {
+    renderQuestion();
+  } else {
+    updateHealth();
+  }
+  roundText.textContent = `Raid question ${room.current + 1} of ${room.questionCount}`;
+  battleBanner.textContent = room.lastFeedback || "Work together. Any teammate can attack.";
+  nextButton.classList.add("hidden");
+}
+
+function renderMultiplayerPlayers(players) {
+  roomPlayers.innerHTML = "";
+  players.forEach((roomPlayer) => {
+    const row = document.createElement("div");
+    row.className = "room-player";
+    const label = document.createElement("span");
+    label.textContent = `${roomPlayer.name}${roomPlayer.isHost ? " (host)" : ""}`;
+    const hp = document.createElement("strong");
+    hp.textContent = `${roomPlayer.hp}/${roomPlayer.maxHp} HP`;
+    row.append(label, hp);
+    if (multiplayerState.isHost && !roomPlayer.isHost) {
+      const kick = document.createElement("button");
+      kick.className = "secondary-button danger-button";
+      kick.type = "button";
+      kick.textContent = "Kick";
+      kick.addEventListener("click", () => kickMultiplayerPlayer(roomPlayer.id));
+      row.append(kick);
+    }
+    roomPlayers.append(row);
+  });
+}
+
+function renderMultiplayerChat(messages) {
+  chatLog.innerHTML = "";
+  messages.forEach((message) => {
+    const line = document.createElement("div");
+    line.className = message.system ? "chat-message system" : "chat-message";
+    line.textContent = message.system ? message.text : `${message.sender}: ${message.text}`;
+    chatLog.append(line);
+  });
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+async function sendMultiplayerChat() {
+  const message = cleanText(chatInput.value);
+  if (!message || !multiplayerState.active) return;
+  chatInput.value = "";
+  const result = await postJson("/api/multiplayer/chat", {
+    code: multiplayerState.code,
+    playerId: multiplayerState.playerId,
+    message,
+  });
+  updateMultiplayerRoom(result.room);
+}
+
+async function kickMultiplayerPlayer(targetId) {
+  const result = await postJson("/api/multiplayer/kick", {
+    code: multiplayerState.code,
+    playerId: multiplayerState.playerId,
+    targetId,
+  });
+  updateMultiplayerRoom(result.room);
+}
+
+async function submitMultiplayerAttack(question, userAnswer) {
+  submitButton.disabled = true;
+  submitButton.textContent = question.type === "typed" ? "AI grading..." : "Attack";
+  try {
+    const result = await postJson("/api/multiplayer/answer", {
+      code: multiplayerState.code,
+      playerId: multiplayerState.playerId,
+      answer: userAnswer,
+    });
+    updateMultiplayerRoom(result.room);
+  } catch (error) {
+    feedbackText.textContent = error.message || "Could not attack in this room.";
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Attack";
+  }
+}
+
 function prepareBattle() {
   const notes = cleanText(notesInput.value);
   if (notes.length < 80) {
@@ -859,6 +1124,8 @@ function prepareBattle() {
 }
 
 async function startBattle() {
+  stopMultiplayerPolling();
+  multiplayerRoomPanel.classList.add("hidden");
   const notes = pendingNotes || cleanText(notesInput.value);
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
   const playerHp = readNumber(playerHpInput, 100, 1, 999);
@@ -1062,6 +1329,11 @@ async function submitAttack() {
     return;
   }
 
+  if (multiplayerState.active) {
+    await submitMultiplayerAttack(question, userAnswer);
+    return;
+  }
+
   submitButton.disabled = true;
   submitButton.textContent = question.type === "typed" ? "AI grading..." : "Attack";
   try {
@@ -1243,6 +1515,8 @@ function showResults() {
 }
 
 function returnToNotes() {
+  stopMultiplayerPolling();
+  multiplayerRoomPanel.classList.add("hidden");
   battleScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
   document.querySelector(".battle-grid").classList.remove("hidden");
@@ -1275,6 +1549,21 @@ demoButton.addEventListener("click", () => {
   notesInput.value = demoNotes;
   battleSetupPanel.classList.add("hidden");
   errorMessage.textContent = "";
+});
+
+multiplayerButton.addEventListener("click", () => {
+  multiplayerPanel.classList.toggle("hidden");
+  multiplayerMessage.textContent = "";
+});
+showHostButton.addEventListener("click", () => setMultiplayerMode("host"));
+showJoinButton.addEventListener("click", () => setMultiplayerMode("join"));
+hostRoomButton.addEventListener("click", hostMultiplayerRoom);
+joinRoomButton.addEventListener("click", joinMultiplayerRoom);
+sendChatButton.addEventListener("click", sendMultiplayerChat);
+chatInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    sendMultiplayerChat();
+  }
 });
 
 summonButton.addEventListener("click", prepareBattle);

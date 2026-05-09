@@ -5,6 +5,8 @@ import json
 import os
 import random
 import re
+import string
+import threading
 import time
 from urllib import error, request
 
@@ -23,6 +25,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DEFAULT_AVATAR_COLORS = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff", "#ff8f3d", "#ffffff", "#111111"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+ROOMS = {}
+ROOM_LOCK = threading.Lock()
 ANSWER_STOPWORDS = {
     "the", "and", "that", "this", "with", "from", "into", "where", "what",
     "which", "their", "there", "about", "have", "has", "are", "was", "were",
@@ -441,6 +445,92 @@ def player_payload(account):
     return player
 
 
+def make_room_code():
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    while True:
+        code = "".join(random.choice(alphabet) for _ in range(5))
+        if code not in ROOMS:
+            return code
+
+
+def make_player_id():
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(random.choice(alphabet) for _ in range(12))
+
+
+def clean_room_name(name, fallback="Player"):
+    name = " ".join(str(name).strip().split())
+    return name[:24] or fallback
+
+
+def multiplayer_damage_for_score(score):
+    if score <= 0:
+        return 0
+    return max(4, round(24 * score))
+
+
+def multiplayer_boss_damage_for_score(score):
+    if score >= 0.9:
+        return 0
+    if score >= 0.65:
+        return 5
+    if score >= 0.35:
+        return 10
+    return 18
+
+
+def grade_multiplayer_answer(question, user_answer):
+    if question.get("type") == "choice":
+        correct = polish_text(user_answer).lower() == str(question.get("answer", "")).lower()
+        return {
+            "score": 1 if correct else 0,
+            "summary": "Spot on. You picked the best answer." if correct else f"Missed it. The best answer was \"{question.get('answer', '')}\".",
+        }
+    return grade_typed_answer_with_groq(question, user_answer)
+
+
+def room_public(room, player_id):
+    players = []
+    for pid, room_player in room["players"].items():
+        players.append({
+            "id": pid,
+            "name": room_player["name"],
+            "hp": room_player["hp"],
+            "maxHp": room_player["maxHp"],
+            "isHost": pid == room["hostId"],
+        })
+    current_question = None
+    if room["questions"] and room["current"] < len(room["questions"]):
+        current_question = room["questions"][room["current"]]
+    return {
+        "code": room["code"],
+        "playerId": player_id,
+        "hostId": room["hostId"],
+        "isHost": player_id == room["hostId"],
+        "status": room["status"],
+        "boss": room["boss"],
+        "health": room["health"],
+        "maxHealth": room["maxHealth"],
+        "current": room["current"],
+        "questionCount": len(room["questions"]),
+        "question": current_question,
+        "players": players,
+        "chat": room["chat"][-40:],
+        "lastFeedback": room["lastFeedback"].get(player_id, ""),
+    }
+
+
+def add_room_chat(room, sender, text, system=False):
+    room["chat"].append({
+        "id": f"{int(time.time() * 1000)}-{len(room['chat'])}",
+        "sender": sender,
+        "text": str(text).strip()[:240],
+        "system": system,
+        "time": int(time.time()),
+    })
+    room["chat"] = room["chat"][-80:]
+
+
 class StudyBossHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
@@ -475,6 +565,24 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/grade-answer":
             self.handle_grade_answer()
+            return
+        if self.path == "/api/multiplayer/host":
+            self.handle_multiplayer_host()
+            return
+        if self.path == "/api/multiplayer/join":
+            self.handle_multiplayer_join()
+            return
+        if self.path == "/api/multiplayer/state":
+            self.handle_multiplayer_state()
+            return
+        if self.path == "/api/multiplayer/answer":
+            self.handle_multiplayer_answer()
+            return
+        if self.path == "/api/multiplayer/chat":
+            self.handle_multiplayer_chat()
+            return
+        if self.path == "/api/multiplayer/kick":
+            self.handle_multiplayer_kick()
             return
         self.send_json(404, {"ok": False, "error": "Unknown endpoint"})
 
@@ -621,6 +729,179 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
             self.send_json(503, {"ok": False, "error": "AI grading failed."})
             return
         self.send_json(200, {"ok": True, "grade": grade, "model": GROQ_MODEL})
+
+    def handle_multiplayer_host(self):
+        data = self.read_json()
+        notes = " ".join(str(data.get("notes", "")).strip().split())
+        host_name = clean_room_name(data.get("name"), "Host")
+        count = min(40, max(1, int(data.get("count", 15) or 15)))
+        player_hp = min(999, max(1, int(data.get("playerHp", 100) or 100)))
+        boss_hp = min(20000, max(1, int(data.get("bossHp", 500) or 500)))
+        if len(notes) < 80:
+            self.send_json(400, {"ok": False, "error": "Add more notes first."})
+            return
+        try:
+            questions = generate_questions_with_groq(notes, count)
+        except Exception as exc:
+            print(f"Groq multiplayer generation failed: {exc}", flush=True)
+            self.send_json(503, {"ok": False, "error": "AI question generation failed."})
+            return
+        if not questions:
+            self.send_json(503, {"ok": False, "error": "AI question generation failed."})
+            return
+        words = important_answer_words(notes)
+        boss_word = polish_text(words[0]) if words else "Study"
+        with ROOM_LOCK:
+            code = make_room_code()
+            player_id = make_player_id()
+            room = {
+                "code": code,
+                "hostId": player_id,
+                "createdAt": int(time.time()),
+                "status": "battle",
+                "boss": f"The {boss_word} Raid Boss",
+                "questions": questions,
+                "current": 0,
+                "health": boss_hp,
+                "maxHealth": boss_hp,
+                "players": {
+                    player_id: {
+                        "name": host_name,
+                        "hp": player_hp,
+                        "maxHp": player_hp,
+                    }
+                },
+                "chat": [],
+                "lastFeedback": {},
+            }
+            add_room_chat(room, "Study Boss", f"{host_name} hosted room {code}.", True)
+            ROOMS[code] = room
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
+
+    def handle_multiplayer_join(self):
+        data = self.read_json()
+        code = str(data.get("code", "")).strip().upper()
+        name = clean_room_name(data.get("name"), "Player")
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room:
+                self.send_json(404, {"ok": False, "error": "Room not found."})
+                return
+            player_id = make_player_id()
+            max_hp = next(iter(room["players"].values()))["maxHp"] if room["players"] else 100
+            room["players"][player_id] = {"name": name, "hp": max_hp, "maxHp": max_hp}
+            add_room_chat(room, "Study Boss", f"{name} joined the raid.", True)
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
+
+    def handle_multiplayer_state(self):
+        data = self.read_json()
+        code = str(data.get("code", "")).strip().upper()
+        player_id = str(data.get("playerId", "")).strip()
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room:
+                self.send_json(404, {"ok": False, "error": "Room not found."})
+                return
+            if player_id not in room["players"]:
+                self.send_json(403, {"ok": False, "error": "You are no longer in this room."})
+                return
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
+
+    def handle_multiplayer_answer(self):
+        data = self.read_json()
+        code = str(data.get("code", "")).strip().upper()
+        player_id = str(data.get("playerId", "")).strip()
+        user_answer = " ".join(str(data.get("answer", "")).strip().split())
+        if not user_answer:
+            self.send_json(400, {"ok": False, "error": "Answer first."})
+            return
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room or player_id not in room["players"]:
+                self.send_json(404, {"ok": False, "error": "Room not found."})
+                return
+            if room["status"] != "battle":
+                self.send_json(409, {"ok": False, "error": "This battle is over."})
+                return
+            if room["players"][player_id]["hp"] <= 0:
+                self.send_json(409, {"ok": False, "error": "You are out of HP."})
+                return
+            question = room["questions"][room["current"]]
+        try:
+            grade = grade_multiplayer_answer(question, user_answer)
+        except Exception as exc:
+            print(f"Groq multiplayer grading failed: {exc}", flush=True)
+            self.send_json(503, {"ok": False, "error": "AI grading failed."})
+            return
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room or player_id not in room["players"]:
+                self.send_json(404, {"ok": False, "error": "Room not found."})
+                return
+            player_entry = room["players"][player_id]
+            damage = multiplayer_damage_for_score(grade["score"])
+            boss_damage = multiplayer_boss_damage_for_score(grade["score"])
+            if damage > 0:
+                room["health"] = max(0, room["health"] - damage)
+                feedback = f"{player_entry['name']} hit for {damage}. {grade['summary']}"
+            else:
+                feedback = f"{player_entry['name']} got blocked. {grade['summary']}"
+            if boss_damage > 0:
+                player_entry["hp"] = max(0, player_entry["hp"] - boss_damage)
+                feedback += f" The boss hit back for {boss_damage}."
+            room["lastFeedback"][player_id] = feedback
+            add_room_chat(room, "Battle", feedback, True)
+            if room["health"] <= 0:
+                room["status"] = "won"
+                add_room_chat(room, "Study Boss", "The raid boss is defeated.", True)
+            elif all(player["hp"] <= 0 for player in room["players"].values()):
+                room["status"] = "lost"
+                add_room_chat(room, "Study Boss", "Everyone is out of HP. The boss wins this round.", True)
+            elif room["current"] < len(room["questions"]) - 1:
+                room["current"] += 1
+            else:
+                room["status"] = "ended"
+                add_room_chat(room, "Study Boss", "No questions left. The boss escaped.", True)
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
+
+    def handle_multiplayer_chat(self):
+        data = self.read_json()
+        code = str(data.get("code", "")).strip().upper()
+        player_id = str(data.get("playerId", "")).strip()
+        message = " ".join(str(data.get("message", "")).strip().split())
+        if not message:
+            self.send_json(400, {"ok": False, "error": "Type a message first."})
+            return
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room or player_id not in room["players"]:
+                self.send_json(404, {"ok": False, "error": "Room not found."})
+                return
+            add_room_chat(room, room["players"][player_id]["name"], message)
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
+
+    def handle_multiplayer_kick(self):
+        data = self.read_json()
+        code = str(data.get("code", "")).strip().upper()
+        player_id = str(data.get("playerId", "")).strip()
+        target_id = str(data.get("targetId", "")).strip()
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if not room or player_id != room.get("hostId"):
+                self.send_json(403, {"ok": False, "error": "Only the host can kick players."})
+                return
+            if target_id == room["hostId"] or target_id not in room["players"]:
+                self.send_json(400, {"ok": False, "error": "That player cannot be kicked."})
+                return
+            removed = room["players"].pop(target_id)
+            add_room_chat(room, "Study Boss", f"{removed['name']} was kicked by the host.", True)
+            payload = room_public(room, player_id)
+        self.send_json(200, {"ok": True, "room": payload})
 
 
 if __name__ == "__main__":

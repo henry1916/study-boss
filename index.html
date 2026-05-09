@@ -120,7 +120,43 @@
               <button class="secondary-button" id="demoButton" type="button">Use demo notes</button>
               <button class="shop-button" id="openShopButton" type="button">Ability Shop</button>
               <button class="shop-button" id="openAvatarShopButton" type="button">Avatar Shop</button>
+              <button class="shop-button" id="multiplayerButton" type="button">Multiplayer</button>
             </div>
+
+            <section class="multiplayer-panel hidden" id="multiplayerPanel" aria-label="Multiplayer setup">
+              <div>
+                <p class="eyebrow">Co-op raid</p>
+                <h3>Multiplayer</h3>
+                <p>Host a room from your notes or join a friend with their code.</p>
+              </div>
+              <div class="auth-tabs multiplayer-tabs" role="tablist" aria-label="Multiplayer mode">
+                <button class="active" id="showHostButton" type="button">Host</button>
+                <button id="showJoinButton" type="button">Join</button>
+              </div>
+              <div id="hostPanel">
+                <div class="setup-grid">
+                  <label>
+                    Questions
+                    <input id="multiQuestionCountInput" class="text-input" type="number" min="1" max="40" value="15" />
+                  </label>
+                  <label>
+                    Each Player HP
+                    <input id="multiPlayerHpInput" class="text-input" type="number" min="1" max="999" value="100" />
+                  </label>
+                  <label>
+                    Boss HP
+                    <input id="multiBossHpInput" class="text-input" type="number" min="1" max="20000" value="600" />
+                  </label>
+                </div>
+                <button class="summon-button" id="hostRoomButton" type="button">Host Room</button>
+              </div>
+              <div id="joinPanel" class="hidden">
+                <label class="notes-label" for="roomCodeInput">Room code</label>
+                <input id="roomCodeInput" class="text-input" maxlength="8" placeholder="ABCDE" />
+                <button class="summon-button" id="joinRoomButton" type="button">Join Room</button>
+              </div>
+              <p class="error-message" id="multiplayerMessage" role="alert"></p>
+            </section>
 
             <section class="shop-panel shop-panel-home hidden" id="homeShopPanel" aria-label="Ability shop">
               <div>
@@ -299,6 +335,18 @@
           </section>
 
           <section class="question-panel">
+            <section class="multiplayer-room hidden" id="multiplayerRoomPanel" aria-label="Multiplayer room">
+              <div class="room-code-row">
+                <span>Room code</span>
+                <strong id="roomCodeText">-----</strong>
+              </div>
+              <div class="player-list" id="roomPlayers"></div>
+              <div class="chat-log" id="chatLog"></div>
+              <div class="chat-row">
+                <input id="chatInput" class="text-input" placeholder="Message your team..." />
+                <button class="secondary-button" id="sendChatButton" type="button">Send</button>
+              </div>
+            </section>
             <div class="round-meta">
               <span id="roundText">Round 1</span>
               <span id="topicText">Topic</span>
