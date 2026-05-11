@@ -27,6 +27,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 ROOMS = {}
 ROOM_LOCK = threading.Lock()
+BOSS_SKINS = ["skin-aqua", "skin-ember", "skin-frost", "skin-shadow", "skin-slime", "skin-storm"]
 ANSWER_STOPWORDS = {
     "the", "and", "that", "this", "with", "from", "into", "where", "what",
     "which", "their", "there", "about", "have", "has", "are", "was", "were",
@@ -565,6 +566,7 @@ def room_public(room, player_id):
         "isHost": player_id == room["hostId"],
         "status": room["status"],
         "boss": room["boss"],
+        "bossSkin": room.get("bossSkin", "skin-aqua"),
         "health": room["health"],
         "maxHealth": room["maxHealth"],
         "current": room["current"],
@@ -820,6 +822,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                 "createdAt": int(time.time()),
                 "status": "battle",
                 "boss": f"The {boss_word} Raid Boss",
+                "bossSkin": random.choice(BOSS_SKINS),
                 "questions": questions,
                 "current": 0,
                 "untilDefeated": until_defeated,

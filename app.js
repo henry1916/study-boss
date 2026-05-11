@@ -118,9 +118,11 @@ const defaultAvatar = { color: "#52d1a8", heroClass: "knight", accessory: "none"
 const freeAvatarColors = ["#52d1a8", "#2d8cff", "#f5c451", "#ff5f6d", "#b987ff", "#ff8f3d", "#ffffff", "#111111"];
 const avatarClasses = ["knight", "mage", "rogue", "tank"];
 const avatarAccessories = ["none", "crown", "headband", "star", "wizardHat", "halo", "visor", "laurel", "spark"];
+const bossSkins = ["skin-aqua", "skin-ember", "skin-frost", "skin-shadow", "skin-slime", "skin-storm"];
 
 let game = {
   boss: "",
+  bossSkin: "skin-aqua",
   questions: [],
   current: 0,
   maxHealth: 100,
@@ -641,6 +643,15 @@ function makeBossName(words) {
   return `The ${core} ${form}`;
 }
 
+function randomBossSkin() {
+  return bossSkins[Math.floor(Math.random() * bossSkins.length)];
+}
+
+function applyBossSkin(skin) {
+  bossSprite.classList.remove(...bossSkins);
+  bossSprite.classList.add(bossSkins.includes(skin) ? skin : "skin-aqua");
+}
+
 function pickAnswer(sentence) {
   const phrases = sentence.match(/\b[A-Z][a-z]+(?:\s+[A-Z]?[a-z]+){0,2}\b/g) || [];
   const candidates = [
@@ -1045,6 +1056,7 @@ function updateMultiplayerRoom(room) {
   multiplayerState.status = room.status;
   roomCodeText.textContent = room.code;
   game.boss = room.boss;
+  game.bossSkin = room.bossSkin || "skin-aqua";
   game.questions = room.question ? [room.question] : [];
   game.current = 0;
   game.untilDefeated = Boolean(room.untilDefeated);
@@ -1055,6 +1067,7 @@ function updateMultiplayerRoom(room) {
   game.playerHealth = me.hp;
   bossName.textContent = room.boss;
   bossTitle.textContent = room.boss;
+  applyBossSkin(game.bossSkin);
   xpValue.textContent = "Co-op";
   coinValue.textContent = room.players.length;
   renderMultiplayerPlayers(room.players);
@@ -1242,6 +1255,7 @@ async function startBattle() {
   const words = importantWords(notes);
   game = {
     boss: makeBossName(words),
+    bossSkin: randomBossSkin(),
     questions,
     current: 0,
     maxHealth: bossHp,
@@ -1258,6 +1272,7 @@ async function startBattle() {
 
   bossName.textContent = game.boss;
   bossTitle.textContent = game.boss;
+  applyBossSkin(game.bossSkin);
   xpValue.textContent = "0";
   updatePlayerHud();
   errorMessage.textContent = "";
