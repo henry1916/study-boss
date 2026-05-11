@@ -376,6 +376,46 @@ Notes:
     return questions[:count]
 
 
+def split_note_sentences(notes):
+    return [sentence.strip(" -") for sentence in re.split(r"(?<=[.!?])\s+|\n+", notes) if len(sentence.strip()) > 12]
+
+
+def backup_questions_from_notes(notes, count, existing=None):
+    questions = []
+    used = set(existing or [])
+    sentences = split_note_sentences(notes) or [notes]
+    for index in range(count * 2):
+        sentence = polish_text(sentences[index % len(sentences)])
+        words = important_answer_words(sentence)
+        topic = polish_text(words[0]) if words else "Study notes"
+        prompt = f"What should you remember about {topic}?"
+        if index >= len(sentences):
+            prompt = f"Review {index - len(sentences) + 1}: explain {topic} in your own words."
+        key = f"{prompt.lower()} {sentence.lower()}"
+        if key in used:
+            continue
+        used.add(key)
+        questions.append({
+            "type": "typed",
+            "prompt": prompt,
+            "answer": sentence,
+            "source": sentence,
+            "hint": f"Think about the note mentioning {topic}.",
+            "topic": topic,
+        })
+        if len(questions) >= count:
+            break
+    return questions
+
+
+def ensure_question_count(notes, questions, count):
+    if len(questions) >= count:
+        return questions[:count]
+    used = {f"{question.get('prompt', '').lower()} {question.get('answer', '').lower()}" for question in questions}
+    questions.extend(backup_questions_from_notes(notes, count - len(questions), used))
+    return questions[:count]
+
+
 def grade_typed_answer_with_groq(question, user_answer):
     prompt = f"""
 Grade this student's open-response answer for a Study Boss battle.
@@ -529,6 +569,7 @@ def room_public(room, player_id):
         "maxHealth": room["maxHealth"],
         "current": room["current"],
         "questionCount": len(room["questions"]),
+        "untilDefeated": room.get("untilDefeated", False),
         "question": current_question,
         "players": players,
         "chat": room["chat"][-40:],
@@ -720,6 +761,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                     continue
                 used.add(key)
                 questions.append(question)
+            questions = ensure_question_count(notes, questions, count)
             if not questions:
                 raise RuntimeError("Groq did not return usable questions.")
         except Exception as exc:
@@ -754,11 +796,12 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
         count = min(40, max(1, int(data.get("count", 15) or 15)))
         player_hp = max(1, int(data.get("playerHp", 100) or 100))
         boss_hp = min(20000, max(1, int(data.get("bossHp", 500) or 500)))
+        until_defeated = bool(data.get("untilDefeated", False))
         if len(notes) < 80:
             self.send_json(400, {"ok": False, "error": "Add more notes first."})
             return
         try:
-            questions = generate_questions_with_groq(notes, count)
+            questions = ensure_question_count(notes, generate_questions_with_groq(notes, count), count)
         except Exception as exc:
             print(f"Groq multiplayer generation failed: {exc}", flush=True)
             self.send_json(503, {"ok": False, "error": "AI question generation failed."})
@@ -779,6 +822,7 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                 "boss": f"The {boss_word} Raid Boss",
                 "questions": questions,
                 "current": 0,
+                "untilDefeated": until_defeated,
                 "health": boss_hp,
                 "maxHealth": boss_hp,
                 "players": {
@@ -881,6 +925,8 @@ class StudyBossHandler(SimpleHTTPRequestHandler):
                 add_room_chat(room, "Study Boss", "Everyone is out of HP. The boss wins this round.", True)
             elif room["current"] < len(room["questions"]) - 1:
                 room["current"] += 1
+            elif room.get("untilDefeated"):
+                room["current"] = 0
             else:
                 room["status"] = "ended"
                 add_room_chat(room, "Study Boss", "No questions left. The boss escaped.", True)

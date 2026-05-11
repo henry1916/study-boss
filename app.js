@@ -33,6 +33,7 @@ const joinPanel = document.querySelector("#joinPanel");
 const multiQuestionCountInput = document.querySelector("#multiQuestionCountInput");
 const multiPlayerHpInput = document.querySelector("#multiPlayerHpInput");
 const multiBossHpInput = document.querySelector("#multiBossHpInput");
+const multiUntilDefeatedInput = document.querySelector("#multiUntilDefeatedInput");
 const hostRoomButton = document.querySelector("#hostRoomButton");
 const roomCodeInput = document.querySelector("#roomCodeInput");
 const joinRoomButton = document.querySelector("#joinRoomButton");
@@ -58,6 +59,7 @@ const battleSetupPanel = document.querySelector("#battleSetupPanel");
 const questionCountInput = document.querySelector("#questionCountInput");
 const playerHpInput = document.querySelector("#playerHpInput");
 const bossHpInput = document.querySelector("#bossHpInput");
+const untilDefeatedInput = document.querySelector("#untilDefeatedInput");
 const startBattleButton = document.querySelector("#startBattleButton");
 const errorMessage = document.querySelector("#errorMessage");
 const backButton = document.querySelector("#backButton");
@@ -126,6 +128,8 @@ let game = {
   maxPlayerHealth: 100,
   playerHealth: 100,
   xp: 0,
+  roundsAnswered: 0,
+  untilDefeated: false,
   selectedAnswer: "",
   locked: false,
   misses: []
@@ -876,6 +880,27 @@ async function buildQuestionsWithAi(notes, count) {
   return result.questions;
 }
 
+function fillQuestionGaps(questions, notes, count) {
+  if (questions.length >= count) return questions.slice(0, count);
+  const used = new Set(questions.map((question) => normalize(`${question.prompt} ${question.answer}`)));
+  buildQuestions(notes, count * 2).forEach((question) => {
+    if (questions.length >= count) return;
+    const key = normalize(`${question.prompt} ${question.answer}`);
+    if (used.has(key)) return;
+    used.add(key);
+    questions.push(question);
+  });
+  const backup = buildQuestions(notes, Math.max(count, 1));
+  for (let index = 0; questions.length < count && backup.length; index += 1) {
+    const source = backup[index % backup.length];
+    questions.push({
+      ...source,
+      prompt: `Review ${Math.floor(index / backup.length) + 1}: ${source.prompt}`,
+    });
+  }
+  return questions.slice(0, count);
+}
+
 async function postJson(url, payload) {
   const response = await fetch(url, {
     method: "POST",
@@ -948,6 +973,7 @@ async function hostMultiplayerRoom() {
       count: readNumber(multiQuestionCountInput, 15, 1, 40),
       playerHp: readNumber(multiPlayerHpInput, 100, 1, Infinity),
       bossHp: readNumber(multiBossHpInput, 600, 1, 20000),
+      untilDefeated: multiUntilDefeatedInput.checked,
     });
     enterMultiplayerRoom(result.room);
   } catch (error) {
@@ -1021,6 +1047,7 @@ function updateMultiplayerRoom(room) {
   game.boss = room.boss;
   game.questions = room.question ? [room.question] : [];
   game.current = 0;
+  game.untilDefeated = Boolean(room.untilDefeated);
   game.maxHealth = room.maxHealth;
   game.health = room.health;
   const me = room.players.find((item) => item.id === room.playerId) || room.players[0] || { hp: 0, maxHp: 1 };
@@ -1052,7 +1079,9 @@ function updateMultiplayerRoom(room) {
   } else {
     updateHealth();
   }
-  roundText.textContent = `Raid question ${room.current + 1} of ${room.questionCount}`;
+  roundText.textContent = room.untilDefeated
+    ? `Raid question ${room.current + 1} · Until KO`
+    : `Raid question ${room.current + 1} of ${room.questionCount}`;
   battleBanner.textContent = room.lastFeedback || "Work together. Any teammate can attack.";
   nextButton.classList.add("hidden");
 }
@@ -1189,11 +1218,13 @@ async function startBattle() {
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
   const playerHp = readNumber(playerHpInput, 100, 1, Infinity);
   const bossHp = readNumber(bossHpInput, 200, 1, 9999);
+  const untilDefeated = untilDefeatedInput.checked;
   startBattleButton.disabled = true;
   startBattleButton.textContent = "Building questions...";
   let questions;
   try {
     questions = await buildQuestionsWithAi(notes, questionCount);
+    questions = fillQuestionGaps(questions, notes, questionCount);
     battleBanner.textContent = "A wild study boss appears. Choose your attack.";
   } catch (error) {
     errorMessage.textContent = "AI question generation could not finish. Check your API key or try again.";
@@ -1218,6 +1249,8 @@ async function startBattle() {
     maxPlayerHealth: playerHp,
     playerHealth: playerHp,
     xp: 0,
+    roundsAnswered: 0,
+    untilDefeated,
     selectedAnswer: "",
     locked: false,
     misses: []
@@ -1247,7 +1280,9 @@ function renderQuestion() {
   submitButton.classList.remove("hidden");
   hintButton.disabled = false;
 
-  roundText.textContent = `Round ${game.current + 1} of ${game.questions.length}`;
+  roundText.textContent = game.untilDefeated
+    ? `Round ${game.roundsAnswered + 1} · Until KO`
+    : `Round ${game.current + 1} of ${game.questions.length}`;
   topicText.textContent = question.topic;
   questionText.textContent = question.prompt;
   updateHealth();
@@ -1444,7 +1479,7 @@ function applyAttack(grade) {
     showBossAttack(`-${bossDamage} HP`);
   }
   updateHealth();
-  if (game.health <= 0 || game.playerHealth <= 0 || game.current === game.questions.length - 1) {
+  if (game.health <= 0 || game.playerHealth <= 0 || (!game.untilDefeated && game.current === game.questions.length - 1)) {
     nextButton.textContent = "Results";
   } else {
     nextButton.textContent = "Next";
@@ -1533,11 +1568,12 @@ function showBossAttack(text) {
 }
 
 function nextRound() {
-  if (game.health <= 0 || game.playerHealth <= 0 || game.current === game.questions.length - 1) {
+  if (game.health <= 0 || game.playerHealth <= 0 || (!game.untilDefeated && game.current === game.questions.length - 1)) {
     showResults();
     return;
   }
-  game.current += 1;
+  game.roundsAnswered += 1;
+  game.current = game.untilDefeated ? (game.current + 1) % game.questions.length : game.current + 1;
   renderQuestion();
 }
 
