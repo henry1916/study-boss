@@ -626,12 +626,13 @@ textarea:focus,
 .party-lineup {
   position: absolute;
   left: 18px;
-  right: 18px;
-  bottom: 184px;
+  right: 46%;
+  bottom: 178px;
   z-index: 4;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  justify-content: center;
+  gap: clamp(4px, 1.3vw, 12px);
   pointer-events: none;
 }
 
@@ -641,6 +642,81 @@ textarea:focus,
   justify-items: center;
   gap: 4px;
   width: 76px;
+  --party-avatar-width: 64px;
+  --party-avatar-height: 78px;
+  --party-head-size: 38px;
+  --party-eye-top: 14px;
+  --party-eye-size: 5px;
+  --party-eye-x: 10px;
+  --party-mouth-top: 21px;
+  --party-mouth-width: 17px;
+  --party-sword-height: 46px;
+  --party-sword-bottom: 32px;
+}
+
+.party-lineup[data-count="1"] {
+  left: 34px;
+  right: 54%;
+  bottom: 162px;
+}
+
+.party-lineup[data-count="1"] .party-member {
+  width: 138px;
+  --party-avatar-width: 122px;
+  --party-avatar-height: 148px;
+  --party-head-size: 72px;
+  --party-eye-top: 26px;
+  --party-eye-size: 9px;
+  --party-eye-x: 19px;
+  --party-mouth-top: 40px;
+  --party-mouth-width: 31px;
+  --party-sword-height: 82px;
+  --party-sword-bottom: 60px;
+}
+
+.party-lineup[data-count="2"] .party-member {
+  width: 108px;
+  --party-avatar-width: 94px;
+  --party-avatar-height: 116px;
+  --party-head-size: 56px;
+  --party-eye-top: 21px;
+  --party-eye-size: 7px;
+  --party-eye-x: 15px;
+  --party-mouth-top: 32px;
+  --party-mouth-width: 25px;
+  --party-sword-height: 66px;
+  --party-sword-bottom: 48px;
+}
+
+.party-lineup[data-count="3"] .party-member {
+  width: 90px;
+  --party-avatar-width: 78px;
+  --party-avatar-height: 96px;
+  --party-head-size: 46px;
+  --party-eye-top: 17px;
+  --party-eye-size: 6px;
+  --party-eye-x: 12px;
+  --party-mouth-top: 26px;
+  --party-mouth-width: 20px;
+  --party-sword-height: 55px;
+  --party-sword-bottom: 39px;
+}
+
+.party-lineup[data-count="5"] .party-member,
+.party-lineup[data-count="6"] .party-member,
+.party-lineup[data-count="7"] .party-member,
+.party-lineup[data-count="8"] .party-member {
+  width: 64px;
+  --party-avatar-width: 54px;
+  --party-avatar-height: 66px;
+  --party-head-size: 32px;
+  --party-eye-top: 12px;
+  --party-eye-size: 4px;
+  --party-eye-x: 8px;
+  --party-mouth-top: 18px;
+  --party-mouth-width: 14px;
+  --party-sword-height: 38px;
+  --party-sword-bottom: 27px;
 }
 
 .party-member.current .party-name {
@@ -655,7 +731,7 @@ textarea:focus,
 
 .party-name,
 .party-hp {
-  max-width: 76px;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid rgba(244, 240, 232, 0.2);
   border-radius: 999px;
@@ -676,14 +752,14 @@ textarea:focus,
 
 .party-avatar {
   position: relative;
-  width: 64px;
-  height: 78px;
+  width: var(--party-avatar-width);
+  height: var(--party-avatar-height);
   filter: drop-shadow(0 12px 12px rgba(0, 0, 0, 0.24));
 }
 
 .party-avatar .avatar-head {
-  width: 38px;
-  height: 38px;
+  width: var(--party-head-size);
+  height: var(--party-head-size);
   border-width: 2px;
 }
 
@@ -693,39 +769,39 @@ textarea:focus,
 }
 
 .party-avatar .avatar-body {
-  width: 52px;
-  height: 45px;
+  width: calc(var(--party-avatar-width) * 0.81);
+  height: calc(var(--party-avatar-height) * 0.58);
   border-width: 2px;
   border-radius: 13px 13px 7px 7px;
 }
 
 .party-avatar .avatar-accessory {
-  width: 42px;
-  height: 20px;
+  width: calc(var(--party-avatar-width) * 0.66);
+  height: calc(var(--party-avatar-height) * 0.26);
 }
 
 .party-avatar .hero-eye {
   position: absolute;
-  top: 14px;
-  width: 5px;
-  height: 5px;
+  top: var(--party-eye-top);
+  width: var(--party-eye-size);
+  height: var(--party-eye-size);
   border-radius: 50%;
   background: var(--ink);
 }
 
 .party-avatar .hero-eye-a {
-  left: 10px;
+  left: var(--party-eye-x);
 }
 
 .party-avatar .hero-eye-b {
-  right: 10px;
+  right: var(--party-eye-x);
 }
 
 .party-avatar .hero-mouth {
   position: absolute;
   left: 50%;
-  top: 21px;
-  width: 17px;
+  top: var(--party-mouth-top);
+  width: var(--party-mouth-width);
   height: 9px;
   border-bottom: 3px solid var(--ink);
   border-radius: 0 0 999px 999px;
@@ -735,9 +811,9 @@ textarea:focus,
 .party-avatar .hero-sword {
   position: absolute;
   right: -4px;
-  bottom: 32px;
+  bottom: var(--party-sword-bottom);
   width: 9px;
-  height: 46px;
+  height: var(--party-sword-height);
   border-radius: 999px;
   background: linear-gradient(#ffffff, #bfe7ff);
   transform: rotate(42deg);
@@ -1043,6 +1119,64 @@ textarea:focus,
 }
 
 #playerHealthFill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  transition: width 0.35s ease;
+}
+
+.team-health-list {
+  display: grid;
+  gap: 8px;
+  max-height: 138px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.team-health-item {
+  display: grid;
+  gap: 4px;
+}
+
+.team-health-item.down {
+  opacity: 0.55;
+}
+
+.team-health-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.team-health-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-health-item.current .team-health-label span {
+  color: var(--green);
+}
+
+.team-health-label strong {
+  flex: 0 0 auto;
+  color: var(--text);
+}
+
+.team-health-bar {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 240, 232, 0.16);
+  border-radius: 999px;
+  background: #0c0e12;
+}
+
+.team-health-bar div {
   width: 100%;
   height: 100%;
   border-radius: inherit;

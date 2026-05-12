@@ -68,8 +68,10 @@ const bossTitle = document.querySelector("#bossTitle");
 const healthText = document.querySelector("#healthText");
 const healthFill = document.querySelector("#healthFill");
 const playerHealthText = document.querySelector("#playerHealthText");
+const playerHealthLabelText = document.querySelector("#playerHealthLabelText");
 const playerHealthDetail = document.querySelector("#playerHealthDetail");
 const playerHealthFill = document.querySelector("#playerHealthFill");
+const teamHealthList = document.querySelector("#teamHealthList");
 const roundText = document.querySelector("#roundText");
 const topicText = document.querySelector("#topicText");
 const battleBanner = document.querySelector("#battleBanner");
@@ -1032,6 +1034,8 @@ function enterMultiplayerRoom(room) {
   document.querySelector(".battle-grid").classList.remove("hidden");
   multiplayerRoomPanel.classList.remove("hidden");
   partyLineup.classList.remove("hidden");
+  teamHealthList.classList.remove("hidden");
+  playerHealthFill.parentElement.classList.add("hidden");
   heroSprite.classList.add("hidden");
   updateMultiplayerRoom(room);
   multiplayerState.pollTimer = window.setInterval(pollMultiplayerRoom, 1800);
@@ -1072,6 +1076,7 @@ function updateMultiplayerRoom(room) {
   coinValue.textContent = room.players.length;
   renderMultiplayerPlayers(room.players);
   renderPartyLineup(room.players, room.playerId);
+  renderTeamHealth(room.players, room.playerId);
   renderMultiplayerChat(room.chat);
   if (room.status !== "battle") {
     questionText.textContent = room.status === "won" ? "Raid boss defeated." : room.status === "lost" ? "Your team was knocked back." : "The boss escaped.";
@@ -1093,7 +1098,7 @@ function updateMultiplayerRoom(room) {
     updateHealth();
   }
   roundText.textContent = room.untilDefeated
-    ? `Raid question ${room.current + 1} · Until KO`
+    ? `Raid question ${room.current + 1} · Until boss or team falls`
     : `Raid question ${room.current + 1} of ${room.questionCount}`;
   battleBanner.textContent = room.lastFeedback || "Work together. Any teammate can attack.";
   nextButton.classList.add("hidden");
@@ -1101,8 +1106,10 @@ function updateMultiplayerRoom(room) {
 
 function renderPartyLineup(players, currentPlayerId) {
   partyLineup.innerHTML = "";
-  partyLineup.classList.toggle("hidden", !multiplayerState.active);
-  players.slice(0, 6).forEach((roomPlayer) => {
+  const visiblePlayers = players.slice(0, 8);
+  partyLineup.dataset.count = String(Math.max(visiblePlayers.length, 1));
+  partyLineup.classList.toggle("hidden", !multiplayerState.active || !visiblePlayers.length);
+  visiblePlayers.forEach((roomPlayer) => {
     const card = document.createElement("div");
     card.className = "party-member";
     if (roomPlayer.id === currentPlayerId) {
@@ -1135,6 +1142,47 @@ function renderPartyLineup(players, currentPlayerId) {
     hp.textContent = `${roomPlayer.hp}/${roomPlayer.maxHp}`;
     card.append(name, avatar, hp);
     partyLineup.append(card);
+  });
+}
+
+function renderTeamHealth(players, currentPlayerId) {
+  if (!teamHealthList) return;
+  teamHealthList.innerHTML = "";
+  teamHealthList.classList.toggle("hidden", !multiplayerState.active);
+  playerHealthFill.parentElement.classList.toggle("hidden", multiplayerState.active);
+  playerHealthLabelText.textContent = "Team HP";
+
+  const totalHp = players.reduce((sum, roomPlayer) => sum + Math.max(roomPlayer.hp, 0), 0);
+  const totalMax = players.reduce((sum, roomPlayer) => sum + Math.max(roomPlayer.maxHp, 1), 0);
+  playerHealthText.textContent = String(totalHp);
+  playerHealthDetail.textContent = `${totalHp} / ${totalMax}`;
+
+  players.forEach((roomPlayer) => {
+    const row = document.createElement("div");
+    row.className = "team-health-item";
+    if (roomPlayer.id === currentPlayerId) {
+      row.classList.add("current");
+    }
+    if (roomPlayer.hp <= 0) {
+      row.classList.add("down");
+    }
+
+    const label = document.createElement("div");
+    label.className = "team-health-label";
+    const name = document.createElement("span");
+    name.textContent = roomPlayer.id === currentPlayerId ? `${roomPlayer.name} (you)` : roomPlayer.name;
+    const hp = document.createElement("strong");
+    hp.textContent = `${Math.max(roomPlayer.hp, 0)} / ${roomPlayer.maxHp}`;
+    label.append(name, hp);
+
+    const bar = document.createElement("div");
+    bar.className = "team-health-bar";
+    const fill = document.createElement("div");
+    fill.style.width = `${Math.max(0, Math.min(100, (roomPlayer.hp / Math.max(roomPlayer.maxHp, 1)) * 100))}%`;
+    bar.append(fill);
+
+    row.append(label, bar);
+    teamHealthList.append(row);
   });
 }
 
@@ -1226,6 +1274,8 @@ async function startBattle() {
   stopMultiplayerPolling();
   multiplayerRoomPanel.classList.add("hidden");
   partyLineup.classList.add("hidden");
+  teamHealthList.classList.add("hidden");
+  playerHealthFill.parentElement.classList.remove("hidden");
   heroSprite.classList.remove("hidden");
   const notes = pendingNotes || cleanText(notesInput.value);
   const questionCount = readNumber(questionCountInput, 15, 1, 50);
@@ -1296,7 +1346,7 @@ function renderQuestion() {
   hintButton.disabled = false;
 
   roundText.textContent = game.untilDefeated
-    ? `Round ${game.roundsAnswered + 1} · Until KO`
+    ? `Round ${game.roundsAnswered + 1} · Until you or boss falls`
     : `Round ${game.current + 1} of ${game.questions.length}`;
   topicText.textContent = question.topic;
   questionText.textContent = question.prompt;
@@ -1322,6 +1372,8 @@ function renderQuestion() {
 function updateHealth() {
   healthText.textContent = `${Math.max(game.health, 0)} / ${game.maxHealth}`;
   healthFill.style.width = `${Math.max(0, (game.health / game.maxHealth) * 100)}%`;
+  if (multiplayerState.active) return;
+  playerHealthLabelText.textContent = "Hero HP";
   playerHealthText.textContent = String(Math.max(game.playerHealth, 0));
   playerHealthDetail.textContent = `${Math.max(game.playerHealth, 0)} / ${game.maxPlayerHealth}`;
   playerHealthFill.style.width = `${Math.max(0, (game.playerHealth / game.maxPlayerHealth) * 100)}%`;
@@ -1628,6 +1680,8 @@ function returnToNotes() {
   stopMultiplayerPolling();
   multiplayerRoomPanel.classList.add("hidden");
   partyLineup.classList.add("hidden");
+  teamHealthList.classList.add("hidden");
+  playerHealthFill.parentElement.classList.remove("hidden");
   heroSprite.classList.remove("hidden");
   battleScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");

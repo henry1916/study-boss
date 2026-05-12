@@ -149,7 +149,7 @@
                   </label>
                   <label class="toggle-row">
                     <input id="multiUntilDefeatedInput" type="checkbox" />
-                    Fight until someone dies
+                    Fight until boss or team dies
                   </label>
                 </div>
                 <button class="summon-button" id="hostRoomButton" type="button">Host Room</button>
@@ -232,7 +232,7 @@
                 </label>
                 <label class="toggle-row">
                   <input id="untilDefeatedInput" type="checkbox" />
-                  Fight until someone dies
+                  Fight until you or boss dies
                 </label>
               </div>
               <button class="summon-button" id="startBattleButton" type="button">
@@ -333,12 +333,13 @@
                   <div id="healthFill"></div>
                 </div>
                 <div class="health-label player-health-label">
-                  <span>Hero HP</span>
+                  <span id="playerHealthLabelText">Hero HP</span>
                   <strong id="playerHealthDetail">100 / 100</strong>
                 </div>
                 <div class="health-bar player-health-bar">
                   <div id="playerHealthFill"></div>
                 </div>
+                <div class="team-health-list hidden" id="teamHealthList"></div>
               </div>
             </div>
           </section>
