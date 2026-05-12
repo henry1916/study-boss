@@ -1186,7 +1186,13 @@ function renderTeamHealth(players, currentPlayerId) {
   playerHealthText.textContent = String(totalHp);
   playerHealthDetail.textContent = `${totalHp} / ${totalMax}`;
 
-  players.forEach((roomPlayer) => {
+  const orderedPlayers = [...players].sort((first, second) => {
+    if (first.id === currentPlayerId) return -1;
+    if (second.id === currentPlayerId) return 1;
+    return 0;
+  });
+
+  orderedPlayers.forEach((roomPlayer) => {
     const row = document.createElement("div");
     row.className = "team-health-item";
     if (roomPlayer.id === currentPlayerId) {

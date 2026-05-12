@@ -626,8 +626,8 @@ textarea:focus,
 .party-lineup {
   position: absolute;
   left: 18px;
-  right: 46%;
-  bottom: 178px;
+  right: 58%;
+  bottom: 250px;
   z-index: 4;
   display: flex;
   align-items: flex-end;
@@ -656,8 +656,8 @@ textarea:focus,
 
 .party-lineup[data-count="1"] {
   left: 34px;
-  right: 54%;
-  bottom: 162px;
+  right: 62%;
+  bottom: 214px;
 }
 
 .party-lineup[data-count="1"] .party-member {
@@ -746,6 +746,7 @@ textarea:focus,
 }
 
 .party-hp {
+  display: none;
   color: var(--gold);
   font-size: 0.66rem;
 }
