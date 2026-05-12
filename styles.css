@@ -922,21 +922,23 @@ textarea:focus,
 
 .boss-horn {
   position: absolute;
-  top: -28px;
-  width: 58px;
-  height: 78px;
+  top: -20px;
+  width: 42px;
+  height: 72px;
   background: var(--boss-horn, var(--gold));
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  clip-path: polygon(50% 0, 84% 100%, 16% 100%);
+  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.08));
+  transform-origin: 50% 100%;
 }
 
 .horn-a {
-  left: 48px;
-  transform: rotate(-18deg);
+  left: 44px;
+  transform: rotate(-26deg);
 }
 
 .horn-b {
-  right: 48px;
-  transform: rotate(18deg);
+  right: 44px;
+  transform: rotate(26deg);
 }
 
 .boss-eye {
@@ -1134,6 +1136,10 @@ textarea:focus,
   gap: 4px;
 }
 
+.team-health-item.current {
+  margin: 2px 0;
+}
+
 .team-health-item.down {
   opacity: 0.55;
 }
@@ -1158,6 +1164,10 @@ textarea:focus,
   color: var(--green);
 }
 
+.team-health-item.current .team-health-label {
+  font-size: 0.96rem;
+}
+
 .team-health-label strong {
   flex: 0 0 auto;
   color: var(--text);
@@ -1169,6 +1179,12 @@ textarea:focus,
   border: 1px solid rgba(244, 240, 232, 0.16);
   border-radius: 999px;
   background: #0c0e12;
+}
+
+.team-health-item.current .team-health-bar {
+  height: 16px;
+  border-color: rgba(82, 209, 168, 0.54);
+  box-shadow: 0 0 18px rgba(82, 209, 168, 0.16);
 }
 
 .team-health-bar div {

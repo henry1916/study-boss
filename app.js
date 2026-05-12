@@ -34,6 +34,7 @@ const multiQuestionCountInput = document.querySelector("#multiQuestionCountInput
 const multiPlayerHpInput = document.querySelector("#multiPlayerHpInput");
 const multiBossHpInput = document.querySelector("#multiBossHpInput");
 const multiUntilDefeatedInput = document.querySelector("#multiUntilDefeatedInput");
+const multiDisplayNameInput = document.querySelector("#multiDisplayNameInput");
 const hostRoomButton = document.querySelector("#hostRoomButton");
 const roomCodeInput = document.querySelector("#roomCodeInput");
 const joinRoomButton = document.querySelector("#joinRoomButton");
@@ -143,6 +144,7 @@ const allowLocalAccountFallback = ["localhost", "127.0.0.1", ""].includes(window
 let activeProfile = localStorage.getItem("studyBossActiveProfile") || "";
 let player = loadPlayer(activeProfile);
 let serverBackedProfile = Boolean(activeProfile && activeProfile !== "guest" && !allowLocalAccountFallback);
+let multiplayerDefaultName = "";
 let pendingNotes = "";
 let multiplayerState = {
   active: false,
@@ -384,6 +386,7 @@ function playAsGuest() {
   player.username = "Guest";
   savePlayer();
   showStartScreen();
+  syncMultiplayerDisplayName(true);
 }
 
 function signOut() {
@@ -928,6 +931,7 @@ async function postJson(url, payload) {
 }
 
 function setMultiplayerMode(mode) {
+  syncMultiplayerDisplayName();
   const hosting = mode === "host";
   hostPanel.classList.toggle("hidden", !hosting);
   joinPanel.classList.toggle("hidden", hosting);
@@ -936,8 +940,31 @@ function setMultiplayerMode(mode) {
   multiplayerMessage.textContent = "";
 }
 
+function guestMultiplayerName() {
+  let guestId = localStorage.getItem("studyBossGuestRaidId");
+  if (!guestId) {
+    guestId = String(Math.floor(1000 + Math.random() * 9000));
+    localStorage.setItem("studyBossGuestRaidId", guestId);
+  }
+  return `Guest-${guestId}`;
+}
+
+function defaultMultiplayerName() {
+  return player.username && player.username.toLowerCase() !== "guest" ? player.username : guestMultiplayerName();
+}
+
+function syncMultiplayerDisplayName(force = false) {
+  const nextDefault = defaultMultiplayerName();
+  const currentName = cleanText(multiDisplayNameInput.value);
+  if (force || !currentName || currentName === multiplayerDefaultName || currentName.toLowerCase() === "guest") {
+    multiDisplayNameInput.value = nextDefault;
+  }
+  multiplayerDefaultName = nextDefault;
+}
+
 function playerDisplayName() {
-  return player.username && player.username !== "Guest" ? player.username : "Guest";
+  syncMultiplayerDisplayName();
+  return cleanText(multiDisplayNameInput.value).slice(0, 18) || defaultMultiplayerName();
 }
 
 function currentAvatar() {
@@ -972,6 +999,7 @@ function stopMultiplayerPolling() {
 
 async function hostMultiplayerRoom() {
   const notes = cleanText(notesInput.value);
+  syncMultiplayerDisplayName();
   if (notes.length < 80) {
     multiplayerMessage.textContent = "Add notes first so the raid boss can be generated.";
     return;
@@ -998,6 +1026,7 @@ async function hostMultiplayerRoom() {
 }
 
 async function joinMultiplayerRoom() {
+  syncMultiplayerDisplayName();
   const code = cleanText(roomCodeInput.value).toUpperCase();
   if (code.length < 4) {
     multiplayerMessage.textContent = "Enter the room code.";
@@ -1718,6 +1747,7 @@ demoButton.addEventListener("click", () => {
 });
 
 multiplayerButton.addEventListener("click", () => {
+  syncMultiplayerDisplayName();
   multiplayerPanel.classList.toggle("hidden");
   multiplayerMessage.textContent = "";
 });
